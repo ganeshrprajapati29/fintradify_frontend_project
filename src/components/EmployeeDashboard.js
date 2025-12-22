@@ -24,6 +24,7 @@ import AttendanceTable from './AttendanceTable';
 import LeaveRequest from './LeaveRequest';
 import SalarySlip from './SalarySlip';
 import EmployeeForm from './EmployeeForm';
+import AttendanceCalendar from './AttendanceCalendar';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'animate.css';
 
@@ -68,10 +69,19 @@ const EmployeeDashboard = () => {
   useEffect(() => {
     const fetchAttendance = async () => {
       try {
-        const res = await axios.get(`${process.env.REACT_APP_API_URL}/employees/attendance`, {
+        const res = await axios.get(`${process.env.REACT_APP_API_URL}/attendance/my-attendance`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
         });
-        setAttendanceData(res.data || []);
+        const processedData = (res.data || []).map(att => {
+          const hoursWorked = att.punchOut && att.punchIn
+            ? ((new Date(att.punchOut) - new Date(att.punchIn)) / (1000 * 60 * 60)).toFixed(2)
+            : '0.00';
+          return {
+            date: new Date(att.date).toISOString().split('T')[0],
+            hoursWorked: parseFloat(hoursWorked),
+          };
+        });
+        setAttendanceData(processedData);
         setError('');
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to fetch attendance data');
@@ -664,26 +674,27 @@ const EmployeeDashboard = () => {
         {/* Sidebar for Desktop */}
         <div className="sidebar d-none d-lg-block">
           <h4 className="animate__animated animate__zoomIn">Fintradify Employee</h4>
-          <Nav className="flex-column">
-            {['profile', 'attendance', 'leaves', 'salary', 'edit-profile'].map((tab) => (
-              <Nav.Link
-                key={tab}
-                className={`animate__animated animate__fadeInLeft ${activeTab === tab ? 'active' : ''}`}
-                style={{ animationDelay: `${0.1 * ['profile', 'attendance', 'leaves', 'salary', 'edit-profile'].indexOf(tab)}s` }}
-                onClick={() => handleTabClick(tab)}
-                aria-current={activeTab === tab ? 'page' : undefined}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  {tab === 'profile' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />}
-                  {tab === 'attendance' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />}
-                  {tab === 'leaves' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />}
-                  {tab === 'salary' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />}
-                  {tab === 'edit-profile' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />}
-                </svg>
-                {tab.charAt(0).toUpperCase() + tab.slice(1).replace('leaves', 'Leave Requests').replace('salary', 'Salary Slips').replace('edit-profile', 'Edit Profile')}
-              </Nav.Link>
-            ))}
-          </Nav>
+              <Nav className="flex-column">
+                {['profile', 'attendance-calendar', 'attendance', 'leaves', 'salary', 'edit-profile'].map((tab) => (
+                  <Nav.Link
+                    key={tab}
+                    className={`animate__animated animate__fadeInLeft ${activeTab === tab ? 'active' : ''}`}
+                    style={{ animationDelay: `${0.1 * ['profile', 'attendance-calendar', 'attendance', 'leaves', 'salary', 'edit-profile'].indexOf(tab)}s` }}
+                    onClick={() => handleTabClick(tab)}
+                    aria-current={activeTab === tab ? 'page' : undefined}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      {tab === 'profile' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />}
+                      {tab === 'attendance-calendar' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />}
+                      {tab === 'attendance' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />}
+                      {tab === 'leaves' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />}
+                      {tab === 'salary' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />}
+                      {tab === 'edit-profile' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />}
+                    </svg>
+                    {tab.charAt(0).toUpperCase() + tab.slice(1).replace('attendance-calendar', 'Attendance Calendar').replace('leaves', 'Leave Requests').replace('salary', 'Salary Slips').replace('edit-profile', 'Edit Profile')}
+                  </Nav.Link>
+                ))}
+              </Nav>
         </div>
 
         {/* Main Content */}
@@ -721,22 +732,23 @@ const EmployeeDashboard = () => {
             </Offcanvas.Header>
             <Offcanvas.Body>
               <Nav className="flex-column">
-                {['profile', 'attendance', 'leaves', 'salary', 'edit-profile'].map((tab) => (
+                {['profile', 'attendance-calendar', 'attendance', 'leaves', 'salary', 'edit-profile'].map((tab) => (
                   <Nav.Link
                     key={tab}
                     className={`animate__animated animate__fadeInLeft ${activeTab === tab ? 'active' : ''}`}
-                    style={{ animationDelay: `${0.1 * ['profile', 'attendance', 'leaves', 'salary', 'edit-profile'].indexOf(tab)}s` }}
+                    style={{ animationDelay: `${0.1 * ['profile', 'attendance-calendar', 'attendance', 'leaves', 'salary', 'edit-profile'].indexOf(tab)}s` }}
                     onClick={() => handleTabClick(tab)}
                     aria-current={activeTab === tab ? 'page' : undefined}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       {tab === 'profile' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />}
-                      {tab === 'attendance' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />}
+                      {tab === 'attendance-calendar' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />}
+                      {tab === 'attendance' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />}
                       {tab === 'leaves' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />}
                       {tab === 'salary' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />}
                       {tab === 'edit-profile' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />}
                     </svg>
-                    {tab.charAt(0).toUpperCase() + tab.slice(1).replace('leaves', 'Leave Requests').replace('salary', 'Salary Slips').replace('edit-profile', 'Edit Profile')}
+                    {tab.charAt(0).toUpperCase() + tab.slice(1).replace('attendance-calendar', 'Attendance Calendar').replace('leaves', 'Leave Requests').replace('salary', 'Salary Slips').replace('edit-profile', 'Edit Profile')}
                   </Nav.Link>
                 ))}
               </Nav>
@@ -802,6 +814,11 @@ const EmployeeDashboard = () => {
                   <EmployeeForm employee={profile} isEmployee />
                 </Card.Body>
               </Card>
+            )}
+            {activeTab === 'attendance-calendar' && (
+              <div className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.1s' }}>
+                <AttendanceCalendar />
+              </div>
             )}
             {activeTab === 'attendance' && (
               <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.2s' }}>

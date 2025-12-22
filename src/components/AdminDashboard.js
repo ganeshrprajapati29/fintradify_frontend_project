@@ -15,6 +15,8 @@ import EmployeeForm from './EmployeeForm';
 import AttendanceTable from './AttendanceTable';
 import LeaveRequest from './LeaveRequest';
 import SalarySlip from './SalarySlip';
+import ManualAttendance from './ManualAttendance';
+import PaidLeaves from './PaidLeaves';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'animate.css';
 
@@ -25,34 +27,133 @@ const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 
-// Dummy EmployeeList component
-const EmployeeList = () => {
-  const dummyEmployees = [
-    { id: 'TRD2502013', name: 'GANESH PRAJAPATI', department: 'Sr Web developer', email: 'sbiganesh0@gmail.com' },
-    { id: 'TRD06468', name: 'Sandeep Sharma', department: 'Sr Telecalling manager', email: 'sandeep.sharma78611@gmail.com' },
-    { id: 'TRD2502014', name: 'Sumit Kumar', department: 'web Developer', email: 'sumitkumar95985@gmail.com' },
-  ];
+// EmployeeList component
+const EmployeeList = ({ mode }) => {
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const fetchEmployees = async () => {
+    try {
+      const res = await axios.get(`${process.env.REACT_APP_API_URL}/employees`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      setEmployees(res.data);
+      setError('');
+    } catch (err) {
+      console.error('Error fetching employees:', err);
+      setError('Failed to fetch employees');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
+
+  const handleTerminate = async (id) => {
+    if (!window.confirm('Are you sure you want to block this employee?')) return;
+    try {
+      await axios.put(`${process.env.REACT_APP_API_URL}/employees/${id}/block`, {}, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      fetchEmployees(); // Refresh list
+    } catch (err) {
+      console.error('Error blocking employee:', err);
+      setError('Failed to block employee');
+    }
+  };
+
+  const handleEnable = async (id) => {
+    try {
+      await axios.put(`${process.env.REACT_APP_API_URL}/employees/${id}/unblock`, {}, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      fetchEmployees(); // Refresh list
+    } catch (err) {
+      console.error('Error unblocking employee:', err);
+      setError('Failed to unblock employee');
+    }
+  };
+
+  if (loading) return <div>Loading employees...</div>;
+
+  const filteredEmployees = mode === 'block' ? employees.filter(emp => emp.status === 'active') :
+                           mode === 'unblock' ? employees.filter(emp => emp.status !== 'active') :
+                           employees;
 
   return (
     <div>
-      <h5 className="text-primary-600 mb-3">Employee List</h5>
+      <h5 className="text-primary-600 mb-3">
+        {mode === 'block' ? 'Block Employees' : mode === 'unblock' ? 'Unblock Employees' : 'Employee List'}
+      </h5>
+      {error && <Alert variant="danger">{error}</Alert>}
       <div className="table-responsive">
         <Table className="table table-bordered table-hover">
           <thead>
             <tr>
               <th>Employee ID</th>
               <th>Name</th>
-              <th>Department</th>
+              <th>Position</th>
               <th>Email</th>
+              <th>Status</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {dummyEmployees.map((emp, index) => (
-              <tr key={emp.id} className="animate__animated animate__fadeIn" style={{ animationDelay: `${0.05 * index}s` }}>
-                <td>{emp.id}</td>
+            {filteredEmployees.map((emp, index) => (
+              <tr key={emp._id} className="animate__animated animate__fadeIn" style={{ animationDelay: `${0.05 * index}s` }}>
+                <td>{emp.employeeId}</td>
                 <td>{emp.name}</td>
-                <td>{emp.department}</td>
+                <td>{emp.position}</td>
                 <td>{emp.email}</td>
+                <td>
+                  <span className={`badge ${emp.status === 'active' ? 'bg-success' : 'bg-danger'}`}>
+                    {emp.status}
+                  </span>
+                </td>
+                <td>
+                  {mode === 'block' && emp.status === 'active' && (
+                    <Button
+                      variant="outline-danger"
+                      size="sm"
+                      onClick={() => handleTerminate(emp._id)}
+                    >
+                      Block
+                    </Button>
+                  )}
+                  {mode === 'unblock' && emp.status !== 'active' && (
+                    <Button
+                      variant="outline-success"
+                      size="sm"
+                      onClick={() => handleEnable(emp._id)}
+                    >
+                      Unblock
+                    </Button>
+                  )}
+                  {!mode && (
+                    <>
+                      <Button
+                        variant="outline-danger"
+                        size="sm"
+                        onClick={() => handleTerminate(emp._id)}
+                        disabled={emp.status !== 'active'}
+                        style={{ marginRight: '5px' }}
+                      >
+                        Block
+                      </Button>
+                      <Button
+                        variant="outline-success"
+                        size="sm"
+                        onClick={() => handleEnable(emp._id)}
+                        disabled={emp.status === 'active'}
+                      >
+                        Unblock
+                      </Button>
+                    </>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -550,11 +651,11 @@ const AdminDashboard = () => {
             <p>Monday - Saturday: 10:00 AM - 6:00 PM<br />Sunday: Closed</p>
           </div>
           <Nav className="flex-column">
-            {['overview', 'add-employee', 'employee-list', 'attendance', 'leaves', 'salary'].map((tab) => (
+            {['overview', 'add-employee', 'employee-list', 'block-employees', 'unblock-employees', 'attendance', 'manual-attendance', 'leaves', 'paid-leaves', 'salary'].map((tab) => (
               <Nav.Link
                 key={tab}
                 className={`animate__animated animate__fadeInLeft ${activeTab === tab ? 'active' : ''}`}
-                style={{ animationDelay: `${0.1 * ['overview', 'add-employee', 'employee-list', 'attendance', 'leaves', 'salary'].indexOf(tab)}s` }}
+                style={{ animationDelay: `${0.1 * ['overview', 'add-employee', 'employee-list', 'block-employees', 'unblock-employees', 'attendance', 'manual-attendance', 'leaves', 'paid-leaves', 'salary'].indexOf(tab)}s` }}
                 onClick={() => handleTabClick(tab)}
                 aria-current={activeTab === tab ? 'page' : undefined}
               >
@@ -562,11 +663,15 @@ const AdminDashboard = () => {
                   {tab === 'overview' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2M9 19" />}
                   {tab === 'add-employee' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />}
                   {tab === 'employee-list' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />}
+                  {tab === 'block-employees' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />}
+                  {tab === 'unblock-employees' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />}
                   {tab === 'attendance' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />}
+                  {tab === 'manual-attendance' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />}
                   {tab === 'leaves' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />}
+                  {tab === 'paid-leaves' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />}
                   {tab === 'salary' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />}
                 </svg>
-                {tab.charAt(0).toUpperCase() + tab.slice(1).replace('overview', 'Dashboard').replace('add-employee', 'Add Employee').replace('employee-list', 'Employee List').replace('salary', 'Salary Slips')}
+                {tab.charAt(0).toUpperCase() + tab.slice(1).replace('overview', 'Dashboard').replace('add-employee', 'Add Employee').replace('employee-list', 'Employee List').replace('block-employees', 'Block Employees').replace('unblock-employees', 'Unblock Employees').replace('salary', 'Salary Slips')}
               </Nav.Link>
             ))}
           </Nav>
@@ -613,11 +718,11 @@ const AdminDashboard = () => {
                 <p>Monday - Saturday: 10:00 AM - 6:00 PM<br />Sunday: Closed</p>
               </div>
               <Nav className="flex-column">
-                {['overview', 'add-employee', 'employee-list', 'attendance', 'leaves', 'salary'].map((tab) => (
+                {['overview', 'add-employee', 'employee-list', 'attendance', 'manual-attendance', 'leaves', 'paid-leaves', 'salary'].map((tab) => (
                   <Nav.Link
                     key={tab}
                     className={`animate__animated animate__fadeInLeft ${activeTab === tab ? 'active' : ''}`}
-                    style={{ animationDelay: `${0.1 * ['overview', 'add-employee', 'employee-list', 'attendance', 'leaves', 'salary'].indexOf(tab)}s` }}
+                    style={{ animationDelay: `${0.1 * ['overview', 'add-employee', 'employee-list', 'attendance', 'manual-attendance', 'leaves', 'paid-leaves', 'salary'].indexOf(tab)}s` }}
                     onClick={() => handleTabClick(tab)}
                     aria-current={activeTab === tab ? 'page' : undefined}
                   >
@@ -736,6 +841,22 @@ const AdminDashboard = () => {
                 </Card.Body>
               </Card>
             )}
+            {activeTab === 'block-employees' && (
+              <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.25s' }}>
+                <Card.Body>
+                  <h3 className="mb-4 fw-bold text-primary-800">Block Employees</h3>
+                  <EmployeeList mode="block" />
+                </Card.Body>
+              </Card>
+            )}
+            {activeTab === 'unblock-employees' && (
+              <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.25s' }}>
+                <Card.Body>
+                  <h3 className="mb-4 fw-bold text-primary-800">Unblock Employees</h3>
+                  <EmployeeList mode="unblock" />
+                </Card.Body>
+              </Card>
+            )}
             {activeTab === 'attendance' && (
               <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.3s' }}>
                 <Card.Body>
@@ -752,8 +873,24 @@ const AdminDashboard = () => {
                 </Card.Body>
               </Card>
             )}
-            {activeTab === 'salary' && (
+            {activeTab === 'manual-attendance' && (
+              <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.4s' }}>
+                <Card.Body>
+                  <h3 className="mb-4 fw-bold text-primary-800">Manual Attendance</h3>
+                  <ManualAttendance />
+                </Card.Body>
+              </Card>
+            )}
+            {activeTab === 'paid-leaves' && (
               <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.5s' }}>
+                <Card.Body>
+                  <h3 className="mb-4 fw-bold text-primary-800">Paid Leaves</h3>
+                  <PaidLeaves isAdmin />
+                </Card.Body>
+              </Card>
+            )}
+            {activeTab === 'salary' && (
+              <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.6s' }}>
                 <Card.Body>
                   <h3 className="mb-4 fw-bold text-primary-800">Salary Slips</h3>
                   <SalarySlip isAdmin />

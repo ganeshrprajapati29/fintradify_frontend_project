@@ -11,6 +11,7 @@ const EmployeeForm = ({ employee, isEmployee }) => {
     phone: employee ? employee.phone : '',
     position: employee ? employee.position : '',
     salary: employee && employee.salary !== 'N/A' ? employee.salary : '',
+    joiningDate: employee ? (employee.joiningDate ? new Date(employee.joiningDate).toISOString().split('T')[0] : '') : '',
     password: '',
   });
   const [error, setError] = useState('');
@@ -48,7 +49,7 @@ const EmployeeForm = ({ employee, isEmployee }) => {
         formData,
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
-      setFormData({ name: '', email: '', phone: '', position: '', salary: '', password: '' });
+      setFormData({ name: '', email: '', phone: '', position: '', salary: '', joiningDate: '', password: '' });
       fetchEmployees();
       setError('');
       alert('Employee added successfully');
@@ -66,6 +67,7 @@ const EmployeeForm = ({ employee, isEmployee }) => {
       phone: emp.phone,
       position: emp.position,
       salary: emp.salary !== 'N/A' ? emp.salary : '',
+      joiningDate: emp.joiningDate ? new Date(emp.joiningDate).toISOString().split('T')[0] : '',
       password: '',
     });
     setShowEditModal(true);
@@ -433,7 +435,6 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                   value={formData.email}
                   onChange={handleChange}
                   required
-                  disabled={isEmployee}
                 />
               </Form.Group>
               <Form.Group controlId="phone" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.3s' }}>
@@ -465,6 +466,20 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                   onChange={handleChange}
                   required
                   disabled={isEmployee}
+                />
+              </Form.Group>
+              <Form.Group controlId="joiningDate" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.45s' }}>
+                <Form.Label>
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Joining Date
+                </Form.Label>
+                <Form.Control
+                  type="date"
+                  name="joiningDate"
+                  value={formData.joiningDate}
+                  disabled
                 />
               </Form.Group>
               <Form.Group controlId="password" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.5s' }}>
@@ -560,6 +575,21 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                   type="text"
                   name="position"
                   value={formData.position}
+                  onChange={handleChange}
+                  required
+                />
+              </Form.Group>
+              <Form.Group controlId="joiningDate" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.45s' }}>
+                <Form.Label>
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Joining Date
+                </Form.Label>
+                <Form.Control
+                  type="date"
+                  name="joiningDate"
+                  value={formData.joiningDate}
                   onChange={handleChange}
                   required
                 />
@@ -731,6 +761,21 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                   type="text"
                   name="position"
                   value={formData.position}
+                  onChange={handleChange}
+                  required
+                />
+              </Form.Group>
+              <Form.Group controlId="joiningDate" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.45s' }}>
+                <Form.Label>
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Joining Date
+                </Form.Label>
+                <Form.Control
+                  type="date"
+                  name="joiningDate"
+                  value={formData.joiningDate}
                   onChange={handleChange}
                   required
                 />

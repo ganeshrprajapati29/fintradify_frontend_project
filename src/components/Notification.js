@@ -9,7 +9,7 @@ const Notification = ({ userId, role }) => {
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
-        const response = await axios.get(`http://localhost:5000/api/notifications/${userId}`);
+        const response = await axios.get(`https://crm.fintradify.com/api/notifications/${userId}`);
         setNotifications(response.data);
       } catch (error) {
         toast.error('Error fetching notifications');
@@ -20,7 +20,7 @@ const Notification = ({ userId, role }) => {
 
   const markAsRead = async (id) => {
     try {
-      await axios.put(`http://localhost:5000/api/notifications/${id}/read`);
+      await axios.put(`https://crm.fintradify.com/api/notifications/${id}/read`);
       setNotifications(notifications.map((notif) =>
         notif._id === id ? { ...notif, status: 'read' } : notif
       ));

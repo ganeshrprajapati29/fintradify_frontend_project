@@ -12,6 +12,34 @@ const SalarySlip = ({ isAdmin }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const handleGenerateMonthly = async () => {
+    if (!isAdmin) {
+      setError('Only admins can generate monthly salary slips');
+      return;
+    }
+    try {
+      const currentDate = new Date();
+      const month = currentDate.getMonth() + 1; // getMonth() returns 0-11
+      const year = currentDate.getFullYear();
+      await axios.post(
+        `${process.env.REACT_APP_API_URL}/salary/generate-monthly`,
+        { month, year },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
+      // Refresh the slips list
+      const res = await axios.get(`${process.env.REACT_APP_API_URL}/salary`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      setSlips(res.data || []);
+      setSuccess('Monthly salary slips generated successfully');
+      setError('');
+    } catch (err) {
+      console.error('Generate monthly slips error:', err.response?.status, err.response?.data);
+      setError(err.response?.data?.message || 'Error generating monthly salary slips');
+      setSuccess('');
+    }
+  };
+
   useEffect(() => {
     const abortController = new AbortController();
 
@@ -344,7 +372,21 @@ const SalarySlip = ({ isAdmin }) => {
           </Alert>
         )}
         {isAdmin && (
-          <Form onSubmit={handleSubmit} className="mb-4 animate__animated animate__fadeInUp" style={{ animationDelay: '0.1s' }}>
+          <div className="mb-4 animate__animated animate__fadeInUp" style={{ animationDelay: '0.1s' }}>
+            <Button
+              variant="primary"
+              onClick={handleGenerateMonthly}
+              className="me-3"
+            >
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+              </svg>
+              Generate Monthly Salary Slips
+            </Button>
+          </div>
+        )}
+        {isAdmin && (
+          <Form onSubmit={handleSubmit} className="mb-4 animate__animated animate__fadeInUp" style={{ animationDelay: '0.2s' }}>
             <Form.Group controlId="employeeId" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.2s' }}>
               <Form.Label>
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">

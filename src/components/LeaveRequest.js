@@ -8,6 +8,7 @@ import 'animate.css';
 const LeaveRequest = ({ isAdmin }) => {
   const [leaves, setLeaves] = useState([]);
   const [formData, setFormData] = useState({ startDate: '', endDate: '', reason: '' });
+  const [leaveBalances, setLeaveBalances] = useState({ paidLeaveBalance: 0, halfDayLeaveBalance: 0 });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -28,8 +29,22 @@ const LeaveRequest = ({ isAdmin }) => {
     }
   };
 
+  const fetchLeaveBalances = async () => {
+    if (isAdmin) return; // Only fetch for employees
+    try {
+      const res = await axios.get(`${process.env.REACT_APP_API_URL}/leaves/balances`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      setLeaveBalances(res.data || { paidLeaveBalance: 0, halfDayLeaveBalance: 0 });
+    } catch (err) {
+      console.error('Error fetching leave balances:', err);
+      // Don't set error for balances, as it's not critical
+    }
+  };
+
   useEffect(() => {
     fetchLeaves();
+    fetchLeaveBalances();
   }, [isAdmin]);
 
   const handleSubmit = async (e) => {
