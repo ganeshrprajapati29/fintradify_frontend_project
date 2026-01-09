@@ -22,13 +22,18 @@ const Profile = () => {
           signal: abortController.signal,
         });
         setFormData({
-          name: res.data.name || '',
-          email: res.data.email || '',
-          phone: res.data.phone || '',
-          address: res.data.address || '',
-          position: res.data.position || '',
+          name: res.data?.name || '',
+          email: res.data?.email || '',
+          phone: res.data?.phone || '',
+          address: res.data?.address || '',
+          position: res.data?.position || '',
+          department: res.data?.department || '',
+          bankAccount: res.data?.bankAccount || '',
+          bankName: res.data?.bankName || '',
+          salary: res.data?.salary || '',
+          joiningDate: res.data?.joiningDate ? new Date(res.data.joiningDate).toISOString().split('T')[0] : '',
           password: '',
-          profilePhoto: res.data.profilePhoto || '',
+          profilePhoto: res.data?.profilePhoto || '',
         });
         setError('');
       } catch (err) {

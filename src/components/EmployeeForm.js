@@ -1091,6 +1091,34 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                   placeholder="Enter new password or leave blank"
                 />
               </Form.Group>
+              <Form.Group controlId="profilePhoto" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.65s' }}>
+                <Form.Label>
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Profile Photo
+                </Form.Label>
+                <Form.Control
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                />
+                {photoPreview && (
+                  <div className="mt-2">
+                    <img
+                      src={photoPreview}
+                      alt="Preview"
+                      style={{
+                        width: '80px',
+                        height: '80px',
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        border: '2px solid #1e40af'
+                      }}
+                    />
+                  </div>
+                )}
+              </Form.Group>
               <Button
                 variant="primary"
                 type="submit"

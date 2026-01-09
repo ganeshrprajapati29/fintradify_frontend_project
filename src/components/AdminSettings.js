@@ -21,6 +21,10 @@ const AdminSettings = () => {
   const [companySettings, setCompanySettings] = useState({});
   const [selectedLogo, setSelectedLogo] = useState(null);
   const [logoPreview, setLogoPreview] = useState('');
+  const [selectedBanner, setSelectedBanner] = useState(null);
+  const [bannerPreview, setBannerPreview] = useState('');
+  const [selectedFavicon, setSelectedFavicon] = useState(null);
+  const [faviconPreview, setFaviconPreview] = useState('');
 
   useEffect(() => {
     fetchSettings();
@@ -217,6 +221,90 @@ const AdminSettings = () => {
     }
   };
 
+  const handleBannerChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedBanner(file);
+      const reader = new FileReader();
+      reader.onload = (e) => setBannerPreview(e.target.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleBannerUpload = async () => {
+    if (!selectedBanner) return;
+
+    setSaving(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const formData = new FormData();
+      formData.append('banner', selectedBanner);
+
+      const res = await axios.post(`${process.env.REACT_APP_API_URL}/settings/banner`, formData, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      setSettings({ ...settings, companyBanner: res.data.bannerUrl });
+      updateSettings({ ...settings, companyBanner: res.data.bannerUrl });
+      setSelectedBanner(null);
+      setBannerPreview('');
+      setSuccess('Company banner updated successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      console.error('Error uploading banner:', err);
+      setError('Failed to upload banner');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleFaviconChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedFavicon(file);
+      const reader = new FileReader();
+      reader.onload = (e) => setFaviconPreview(e.target.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleFaviconUpload = async () => {
+    if (!selectedFavicon) return;
+
+    setSaving(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const formData = new FormData();
+      formData.append('favicon', selectedFavicon);
+
+      const res = await axios.post(`${process.env.REACT_APP_API_URL}/settings/favicon`, formData, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      setSettings({ ...settings, companyFavicon: res.data.faviconUrl });
+      updateSettings({ ...settings, companyFavicon: res.data.faviconUrl });
+      setSelectedFavicon(null);
+      setFaviconPreview('');
+      setSuccess('Company favicon updated successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      console.error('Error uploading favicon:', err);
+      setError('Failed to upload favicon');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <Container className="py-5">
@@ -346,6 +434,135 @@ const AdminSettings = () => {
                   </Form.Group>
                 </Col>
               </Row>
+
+              {/* Company Assets Section */}
+              <hr className="my-4" />
+              <h5 className="mb-3">Company Assets</h5>
+
+              {/* Logo Upload */}
+              <Row className="mb-4">
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>Company Logo</Form.Label>
+                    <Form.Control
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoChange}
+                      className="mb-2"
+                    />
+                    <Button
+                      variant="outline-primary"
+                      size="sm"
+                      onClick={handleLogoUpload}
+                      disabled={!selectedLogo || saving}
+                    >
+                      Upload Logo
+                    </Button>
+                  </Form.Group>
+                  {logoPreview && (
+                    <div className="mt-2">
+                      <img
+                        src={logoPreview}
+                        alt="Logo Preview"
+                        style={{ width: '100px', height: '100px', objectFit: 'contain', border: '1px solid #ddd', borderRadius: '5px' }}
+                      />
+                    </div>
+                  )}
+                  {settings.companyLogo && !logoPreview && (
+                    <div className="mt-2">
+                      <p className="text-muted small">Current Logo:</p>
+                      <img
+                        src={settings.companyLogo}
+                        alt="Current Logo"
+                        style={{ width: '100px', height: '100px', objectFit: 'contain', border: '1px solid #ddd', borderRadius: '5px' }}
+                      />
+                    </div>
+                  )}
+                </Col>
+
+                {/* Banner Upload */}
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>Company Banner</Form.Label>
+                    <Form.Control
+                      type="file"
+                      accept="image/*"
+                      onChange={handleBannerChange}
+                      className="mb-2"
+                    />
+                    <Button
+                      variant="outline-success"
+                      size="sm"
+                      onClick={handleBannerUpload}
+                      disabled={!selectedBanner || saving}
+                    >
+                      Upload Banner
+                    </Button>
+                  </Form.Group>
+                  {bannerPreview && (
+                    <div className="mt-2">
+                      <img
+                        src={bannerPreview}
+                        alt="Banner Preview"
+                        style={{ width: '200px', height: '100px', objectFit: 'cover', border: '1px solid #ddd', borderRadius: '5px' }}
+                      />
+                    </div>
+                  )}
+                  {settings.companyBanner && !bannerPreview && (
+                    <div className="mt-2">
+                      <p className="text-muted small">Current Banner:</p>
+                      <img
+                        src={settings.companyBanner}
+                        alt="Current Banner"
+                        style={{ width: '200px', height: '100px', objectFit: 'cover', border: '1px solid #ddd', borderRadius: '5px' }}
+                      />
+                    </div>
+                  )}
+                </Col>
+              </Row>
+
+              {/* Favicon Upload */}
+              <Row className="mb-4">
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>Company Favicon</Form.Label>
+                    <Form.Control
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFaviconChange}
+                      className="mb-2"
+                    />
+                    <Button
+                      variant="outline-info"
+                      size="sm"
+                      onClick={handleFaviconUpload}
+                      disabled={!selectedFavicon || saving}
+                    >
+                      Upload Favicon
+                    </Button>
+                  </Form.Group>
+                  {faviconPreview && (
+                    <div className="mt-2">
+                      <img
+                        src={faviconPreview}
+                        alt="Favicon Preview"
+                        style={{ width: '32px', height: '32px', objectFit: 'contain', border: '1px solid #ddd', borderRadius: '3px' }}
+                      />
+                    </div>
+                  )}
+                  {settings.companyFavicon && !faviconPreview && (
+                    <div className="mt-2">
+                      <p className="text-muted small">Current Favicon:</p>
+                      <img
+                        src={settings.companyFavicon}
+                        alt="Current Favicon"
+                        style={{ width: '32px', height: '32px', objectFit: 'contain', border: '1px solid #ddd', borderRadius: '3px' }}
+                      />
+                    </div>
+                  )}
+                </Col>
+              </Row>
+
               <div className="text-end">
                 <Button variant="primary" onClick={() => handleSave('general')} disabled={saving}>
                   <FaSave className="me-2" />
