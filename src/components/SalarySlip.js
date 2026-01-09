@@ -1,12 +1,13 @@
+
 import React, { useState, useEffect } from 'react';
-import { Form, Button, Table, Alert } from 'react-bootstrap';
 import axios from 'axios';
 import moment from 'moment';
+import { Form, Button, Table, Alert } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'animate.css';
 
 const SalarySlip = ({ isAdmin }) => {
-  const [formData, setFormData] = useState({ employeeId: '', month: '', hourlyRate: '' });
+  const [formData, setFormData] = useState({ employeeId: '', month: '', fixedAmount: '' });
   const [slips, setSlips] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [error, setError] = useState('');
@@ -45,12 +46,12 @@ const SalarySlip = ({ isAdmin }) => {
 
     const fetchData = async () => {
       try {
-        const url = isAdmin ? '/salary' : '/salary/my-slips';
+    const url = isAdmin ? '/salary' : '/salary/my-slips';
         const res = await axios.get(`${process.env.REACT_APP_API_URL}${url}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
           signal: abortController.signal,
         });
-        setSlips(res.data || []);
+        setSlips(res.data.data || []);
         if (isAdmin) {
           const empRes = await axios.get(`${process.env.REACT_APP_API_URL}/employees`, {
             headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
@@ -81,10 +82,10 @@ const SalarySlip = ({ isAdmin }) => {
     try {
       await axios.post(
         `${process.env.REACT_APP_API_URL}/salary`,
-        { ...formData, hourlyRate: parseFloat(formData.hourlyRate) },
+        formData,
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
-      setFormData({ employeeId: '', month: '', hourlyRate: '' });
+      setFormData({ employeeId: '', month: '', fixedAmount: '' });
       const res = await axios.get(`${process.env.REACT_APP_API_URL}/salary`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       });
@@ -424,22 +425,22 @@ const SalarySlip = ({ isAdmin }) => {
                 max={moment().format('YYYY-MM')}
               />
             </Form.Group>
-            <Form.Group controlId="hourlyRate" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.4s' }}>
+            <Form.Group controlId="fixedAmount" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.4s' }}>
               <Form.Label>
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                Hourly Rate (₹)
+                Fixed Amount (₹)
               </Form.Label>
               <Form.Control
                 type="number"
-                name="hourlyRate"
-                value={formData.hourlyRate}
+                name="fixedAmount"
+                value={formData.fixedAmount}
                 onChange={handleChange}
                 required
                 min="0"
                 step="0.01"
-                placeholder="Enter hourly rate"
+                placeholder="Enter fixed amount"
               />
             </Form.Group>
             <Button
@@ -462,8 +463,19 @@ const SalarySlip = ({ isAdmin }) => {
                 <th>Employee ID</th>
                 <th>Name</th>
                 <th>Month</th>
-                <th>Hours Worked</th>
-                <th>Amount (₹)</th>
+                <th>Basic Pay</th>
+                <th>HRA</th>
+                <th>Conveyance</th>
+                <th>Medical</th>
+                <th>LTA</th>
+                <th>Other Allow.</th>
+                <th>Total Earnings</th>
+                <th>PF</th>
+                <th>Professional Tax</th>
+                <th>Gratuity</th>
+                <th>Other Ded.</th>
+                <th>Total Ded.</th>
+                <th>Net Salary</th>
                 <th>Action</th>
               </tr>
             </thead>
@@ -473,9 +485,20 @@ const SalarySlip = ({ isAdmin }) => {
                   <tr key={slip._id} className="animate__animated animate__fadeIn" style={{ animationDelay: `${0.05 * index}s` }}>
                     <td>{slip.employee?.employeeId || 'N/A'}</td>
                     <td>{slip.employee?.name || 'N/A'}</td>
-                    <td>{slip.month ? moment(slip.month).format('MMMM YYYY') : 'N/A'}</td>
-                    <td>{slip.hoursWorked ? slip.hoursWorked.toFixed(2) : '0.00'}</td>
-                    <td>₹{slip.amount ? slip.amount.toFixed(2) : '0.00'}</td>
+                    <td>{slip.month ? moment(slip.month).format('MMM YYYY') : 'N/A'}</td>
+                    <td>₹{slip.basicPay ? slip.basicPay.toFixed(2) : '0.00'}</td>
+                    <td>₹{slip.hra ? slip.hra.toFixed(2) : '0.00'}</td>
+                    <td>₹{slip.conveyanceAllowance ? slip.conveyanceAllowance.toFixed(2) : '0.00'}</td>
+                    <td>₹{slip.medicalAllowance ? slip.medicalAllowance.toFixed(2) : '0.00'}</td>
+                    <td>₹{slip.lta ? slip.lta.toFixed(2) : '0.00'}</td>
+                    <td>₹{slip.otherAllowances ? slip.otherAllowances.toFixed(2) : '0.00'}</td>
+                    <td><strong>₹{slip.totalEarnings ? slip.totalEarnings.toFixed(2) : '0.00'}</strong></td>
+                    <td>₹{slip.pf ? slip.pf.toFixed(2) : '0.00'}</td>
+                    <td>₹{slip.professionalTax ? slip.professionalTax.toFixed(2) : '0.00'}</td>
+                    <td>₹{slip.gratuity ? slip.gratuity.toFixed(2) : '0.00'}</td>
+                    <td>₹{slip.otherDeductions ? slip.otherDeductions.toFixed(2) : '0.00'}</td>
+                    <td><strong>₹{slip.totalDeductions ? slip.totalDeductions.toFixed(2) : '0.00'}</strong></td>
+                    <td><strong style={{color: '#1e40af'}}>₹{slip.netSalary ? slip.netSalary.toFixed(2) : '0.00'}</strong></td>
                     <td>
                       <Button
                         variant="primary"
@@ -493,7 +516,7 @@ const SalarySlip = ({ isAdmin }) => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" className="table-empty">No salary slips available</td>
+                  <td colSpan="17" className="table-empty">No salary slips available</td>
                 </tr>
               )}
             </tbody>

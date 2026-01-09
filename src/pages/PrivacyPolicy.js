@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
 const PrivacyPolicy = () => {
+  const [darkMode, setDarkMode] = useState(false);
   return (
     <div>
-      <Navbar />
+      <Navbar darkMode={darkMode} onThemeToggle={() => setDarkMode(!darkMode)} />
       <div className="container" style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
         <h1 style={{ textAlign: 'center', marginBottom: '30px' }}>Privacy Policy</h1>
         <p>At Fintradify, we are committed to protecting your privacy. This Privacy Policy outlines how we collect, use, and safeguard your information.</p>
@@ -27,7 +28,7 @@ const PrivacyPolicy = () => {
 
         <p>Last updated: October 2023</p>
       </div>
-      <Footer />
+      <Footer darkMode={darkMode} />
     </div>
   );
 };

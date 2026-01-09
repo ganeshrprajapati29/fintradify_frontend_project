@@ -14,12 +14,17 @@ const PaidLeaves = ({ isAdmin }) => {
   const [success, setSuccess] = useState('');
 
   const fetchLeaveData = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError('Please login to view leave data');
+      return;
+    }
     try {
       const url = isAdmin
         ? `${process.env.REACT_APP_API_URL}/leaves/employee-data`
         : `${process.env.REACT_APP_API_URL}/leaves/my-employee-data`;
       const res = await axios.get(url, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (isAdmin) {
         setLeaveData(res.data);
@@ -35,12 +40,14 @@ const PaidLeaves = ({ isAdmin }) => {
   };
 
   const fetchLeaves = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return; // Skip if no token
     try {
       const url = isAdmin
         ? `${process.env.REACT_APP_API_URL}/leaves`
         : `${process.env.REACT_APP_API_URL}/leaves/my-leaves`;
       const res = await axios.get(url, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       // Filter for paid leaves
       const paidLeaves = res.data ? res.data.filter(leave => leave.type === 'paid') : [];
@@ -55,9 +62,11 @@ const PaidLeaves = ({ isAdmin }) => {
 
   const fetchLeaveBalances = async () => {
     if (isAdmin) return; // Only fetch for employees
+    const token = localStorage.getItem('token');
+    if (!token) return; // Skip if no token
     try {
-      const res = await axios.get(`${process.env.REACT_APP_API_URL}/leaves/balances`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      const res = await axios.get(`${process.env.REACT_APP_API_URL}/leaves/my-balances`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
       setLeaveBalances(res.data || { paidLeaveBalance: 0, halfDayLeaveBalance: 0 });
     } catch (err) {
@@ -78,12 +87,17 @@ const PaidLeaves = ({ isAdmin }) => {
       setError('Admins cannot request paid leaves');
       return;
     }
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError('Please login to request leave');
+      return;
+    }
     try {
       await axios.post(`${process.env.REACT_APP_API_URL}/leaves`, {
         ...formData,
         type: 'paid'
       }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       setSuccess('Paid leave requested successfully');
       setFormData({ startDate: '', endDate: '', reason: '' });
@@ -418,8 +432,18 @@ const PaidLeaves = ({ isAdmin }) => {
                 <div className="info-value">{employee.remainingLeaves}</div>
               </div>
               <div className="info-item">
+                <div className="info-label">Taken Leaves</div>
+                <div className="info-value">{employee.usedPaidLeaves || 0}</div>
+              </div>
+            </div>
+            <div className="info-grid">
+              <div className="info-item">
                 <div className="info-label">Joining Date</div>
                 <div className="info-value">{moment(employee.joiningDate).format('MMM DD, YYYY')}</div>
+              </div>
+              <div className="info-item">
+                <div className="info-label">Eligibility Date</div>
+                <div className="info-value">{moment(employee.eligibilityDate).format('MMM DD, YYYY')}</div>
               </div>
             </div>
 

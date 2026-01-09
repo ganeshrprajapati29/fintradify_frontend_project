@@ -32,10 +32,14 @@ const LeaveRequest = ({ isAdmin }) => {
   const fetchLeaveBalances = async () => {
     if (isAdmin) return; // Only fetch for employees
     try {
-      const res = await axios.get(`${process.env.REACT_APP_API_URL}/leaves/balances`, {
+      const res = await axios.get(`${process.env.REACT_APP_API_URL}/leaves/my-employee-data`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       });
-      setLeaveBalances(res.data || { paidLeaveBalance: 0, halfDayLeaveBalance: 0 });
+      setLeaveBalances({
+        paidLeaveBalance: res.data.remainingLeaves || 0,
+        unpaidLeaveBalance: res.data.unpaidLeaveBalance || 0,
+        halfDayLeaveBalance: res.data.halfDayLeaveBalance || 0
+      });
     } catch (err) {
       console.error('Error fetching leave balances:', err);
       // Don't set error for balances, as it's not critical
@@ -53,6 +57,18 @@ const LeaveRequest = ({ isAdmin }) => {
       setError('Admins cannot request leaves');
       return;
     }
+
+    // Calculate number of days requested
+    const start = moment(formData.startDate);
+    const end = moment(formData.endDate);
+    const daysRequested = end.diff(start, 'days') + 1;
+
+    // Check if employee has enough paid leave balance
+    if (daysRequested > leaveBalances.paidLeaveBalance) {
+      setError(`Insufficient paid leave balance. You have ${leaveBalances.paidLeaveBalance} days available, but requested ${daysRequested} days.`);
+      return;
+    }
+
     try {
       await axios.post(`${process.env.REACT_APP_API_URL}/leaves`, formData, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
@@ -60,6 +76,7 @@ const LeaveRequest = ({ isAdmin }) => {
       setSuccess('Leave requested successfully');
       setFormData({ startDate: '', endDate: '', reason: '' });
       fetchLeaves();
+      fetchLeaveBalances(); // Refresh balances after request
       setError('');
     } catch (err) {
       console.error('Request leave error:', err);
@@ -373,7 +390,23 @@ const LeaveRequest = ({ isAdmin }) => {
           </Alert>
         )}
         {!isAdmin && (
-          <Form onSubmit={handleSubmit} className="mb-4 animate__animated animate__fadeInUp" style={{ animationDelay: '0.1s' }}>
+          <div className="leave-balances mb-4 animate__animated animate__fadeInUp" style={{ animationDelay: '0.1s' }}>
+            <h5>Leave Balances</h5>
+            <div className="d-flex gap-4">
+              <div>
+                <strong>Paid Leaves:</strong> {leaveBalances.paidLeaveBalance || 0}
+              </div>
+              <div>
+                <strong>Unpaid Leaves:</strong> {leaveBalances.unpaidLeaveBalance || 0}
+              </div>
+              <div>
+                <strong>Half Day Leaves:</strong> {leaveBalances.halfDayLeaveBalance || 0}
+              </div>
+            </div>
+          </div>
+        )}
+        {!isAdmin && (
+          <Form onSubmit={handleSubmit} className="mb-4 animate__animated animate__fadeInUp" style={{ animationDelay: '0.2s' }}>
             <Form.Group controlId="startDate" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.2s' }}>
               <Form.Label>
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">

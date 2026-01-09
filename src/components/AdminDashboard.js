@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Navbar, Nav, Button, Container, Card, Offcanvas, Table, Alert } from 'react-bootstrap';
-import { useHistory } from 'react-router-dom';
+ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Bar } from 'react-chartjs-2';
+import { Bar, Line, Pie, Doughnut } from 'react-chartjs-2';
+import { useHistory } from 'react-router-dom';
+import { Container, Navbar, Nav, Button, Card, Table, Alert, Offcanvas, Badge } from 'react-bootstrap';
 import {
   Chart as ChartJS,
   BarElement,
@@ -10,18 +10,33 @@ import {
   LinearScale,
   Tooltip,
   Legend,
+  LineElement,
+  PointElement,
+  ArcElement,
+  Filler,
 } from 'chart.js';
-import EmployeeForm from './EmployeeForm';
+
 import AttendanceTable from './AttendanceTable';
+import AttendanceList from './AttendanceList';
 import LeaveRequest from './LeaveRequest';
 import SalarySlip from './SalarySlip';
 import ManualAttendance from './ManualAttendance';
+import ActiveAttendance from './ActiveAttendance';
 import PaidLeaves from './PaidLeaves';
+import EmployeeForm from './EmployeeForm';
+import AdminSettings from './AdminSettings';
+import AdminTasks from './AdminTasks';
+import AdminReimbursement from './AdminReimbursement';
+import Notification from './Notification';
+import EmployeeTeams from './EmployeeTeams';
+import EmployeeTracking from './EmployeeTracking';
+import RelievingLetter from './RelievingLetter';
+import OfferLetter from './OfferLetter';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'animate.css';
 
 // Register Chart.js components
-ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
+ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend, LineElement, PointElement, ArcElement, Filler);
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -93,6 +108,7 @@ const EmployeeList = ({ mode }) => {
         <Table className="table table-bordered table-hover">
           <thead>
             <tr>
+              <th>Photo</th>
               <th>Employee ID</th>
               <th>Name</th>
               <th>Position</th>
@@ -104,6 +120,38 @@ const EmployeeList = ({ mode }) => {
           <tbody>
             {filteredEmployees.map((emp, index) => (
               <tr key={emp._id} className="animate__animated animate__fadeIn" style={{ animationDelay: `${0.05 * index}s` }}>
+                <td>
+                  {emp.profilePhoto ? (
+                    <img
+                      src={emp.profilePhoto}
+                      alt="Profile"
+                      style={{
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        border: '2px solid #1e40af'
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '50%',
+                        background: '#bfdbfe',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '1rem',
+                        fontWeight: 'bold',
+                        color: '#1e40af'
+                      }}
+                    >
+                      {(emp.name || 'U')[0].toUpperCase()}
+                    </div>
+                  )}
+                </td>
                 <td>{emp.employeeId}</td>
                 <td>{emp.name}</td>
                 <td>{emp.position}</td>
@@ -169,6 +217,8 @@ const AdminDashboard = () => {
   const [overview, setOverview] = useState({});
   const [showSidebar, setShowSidebar] = useState(false);
   const [error, setError] = useState('');
+  const [profile, setProfile] = useState({});
+  const [notificationCount, setNotificationCount] = useState(0);
   const history = useHistory();
 
   // Dynamic greeting based on time
@@ -178,6 +228,21 @@ const AdminDashboard = () => {
     if (hour < 17) return 'Good Afternoon';
     return 'Good Evening';
   };
+
+  // Fetch profile
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const res = await axios.get(`${process.env.REACT_APP_API_URL}/employees/profile`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        });
+        setProfile(res.data || {});
+      } catch (err) {
+        console.error('Error fetching profile:', err);
+      }
+    };
+    fetchProfile();
+  }, []);
 
   // Live clock update
   useEffect(() => {
@@ -202,6 +267,21 @@ const AdminDashboard = () => {
       }
     };
     fetchOverview();
+  }, []);
+
+  // Fetch notification count
+  useEffect(() => {
+    const fetchNotificationCount = async () => {
+      try {
+        const res = await axios.get(`${process.env.REACT_APP_API_URL}/notifications/count`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        });
+        setNotificationCount(res.data.count || 0);
+      } catch (err) {
+        console.error('Error fetching notification count:', err);
+      }
+    };
+    fetchNotificationCount();
   }, []);
 
   // Chart data
@@ -317,6 +397,7 @@ const AdminDashboard = () => {
             z-index: 1000;
             transition: transform 0.3s ease-in-out;
             border-right: 2px solid rgba(30, 64, 175, 0.2);
+            overflow-y: auto;
           }
           .sidebar h4 {
             font-size: 1.8rem;
@@ -651,7 +732,7 @@ const AdminDashboard = () => {
             <p>Monday - Saturday: 10:00 AM - 6:00 PM<br />Sunday: Closed</p>
           </div>
           <Nav className="flex-column">
-            {['overview', 'add-employee', 'employee-list', 'block-employees', 'unblock-employees', 'attendance', 'manual-attendance', 'leaves', 'paid-leaves', 'salary'].map((tab) => (
+            {['overview', 'add-employee', 'edit-employee', 'employee-list', 'block-employees', 'unblock-employees', 'teams', 'tracking', 'attendance', 'manual-attendance', 'active-attendance', 'leaves', 'paid-leaves', 'tasks', 'salary', 'relieving-letter', 'offer-letter', 'reimbursements', 'notifications', 'settings'].map((tab) => (
               <Nav.Link
                 key={tab}
                 className={`animate__animated animate__fadeInLeft ${activeTab === tab ? 'active' : ''}`}
@@ -662,14 +743,25 @@ const AdminDashboard = () => {
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   {tab === 'overview' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2M9 19" />}
                   {tab === 'add-employee' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />}
+                  {tab === 'edit-employee' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />}
                   {tab === 'employee-list' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />}
                   {tab === 'block-employees' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />}
                   {tab === 'unblock-employees' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />}
                   {tab === 'attendance' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />}
                   {tab === 'manual-attendance' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />}
+                  {tab === 'active-attendance' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />}
                   {tab === 'leaves' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />}
                   {tab === 'paid-leaves' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />}
+                  {tab === 'tasks' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />}
                   {tab === 'salary' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />}
+                  {tab === 'relieving-letter' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />}
+                  {tab === 'offer-letter' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />}
+                  {tab === 'reimbursements' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />}
+                  {tab === 'notifications' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />}
+                  {tab === 'teams' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />}
+                  {tab === 'tracking' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />}
+                  {tab === 'settings' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />}
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
                 {tab.charAt(0).toUpperCase() + tab.slice(1).replace('overview', 'Dashboard').replace('add-employee', 'Add Employee').replace('employee-list', 'Employee List').replace('block-employees', 'Block Employees').replace('unblock-employees', 'Unblock Employees').replace('salary', 'Salary Slips')}
               </Nav.Link>
@@ -692,9 +784,125 @@ const AdminDashboard = () => {
                 </svg>
               </Button>
               <Navbar.Brand className="animate__animated animate__zoomIn">Fintradify Admin</Navbar.Brand>
-              <Navbar.Text className="ms-auto animate__animated animate__fadeIn">
-                {currentTime.split(',')[0]} | {DAYS[new Date().getDay()]}, {MONTHS[new Date().getMonth()]} {new Date().getDate()}, {new Date().getFullYear()}
-              </Navbar.Text>
+              <div className="d-flex align-items-center ms-auto">
+                {profile.name && (
+                  <div className="d-flex align-items-center me-3">
+                    {profile.profilePhoto ? (
+                      <img
+                        src={profile.profilePhoto}
+                        alt="Profile"
+                        style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '50%',
+                          objectFit: 'cover',
+                          border: '2px solid #1e40af',
+                          marginRight: '10px'
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '50%',
+                          background: '#bfdbfe',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '1rem',
+                          fontWeight: 'bold',
+                          color: '#1e40af',
+                          marginRight: '10px'
+                        }}
+                      >
+                        {(profile.name || 'A')[0].toUpperCase()}
+                      </div>
+                    )}
+                    <span className="text-primary-800 fw-bold">{profile.name}</span>
+                  </div>
+                )}
+                <Navbar.Text className="animate__animated animate__fadeIn me-3">
+                  {currentTime.split(',')[0]} | {DAYS[new Date().getDay()]}, {MONTHS[new Date().getMonth()]} {new Date().getDate()}, {new Date().getFullYear()}
+                </Navbar.Text>
+               <Button
+  variant="outline-light"
+  onClick={() => handleTabClick('settings')}
+  className="animate__animated animate__fadeIn me-2 position-relative"
+  style={{ animationDelay: '0.15s' }}
+  aria-label="Settings"
+>
+  <svg
+    width="20"
+    height="20"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"
+    />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 8a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 8 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 14 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 8c.69 0 1.28.4 1.51 1H21a2 2 0 1 1 0 4h-.09c-.23.6-.82 1-1.51 1z"
+    />
+  </svg>
+
+  <Badge
+    pill
+    bg="warning"
+    className="position-absolute top-0 start-100 translate-middle"
+    style={{ fontSize: '0.7rem' }}
+  >
+    !
+  </Badge>
+</Button>
+<Button
+  variant="outline-light"
+  onClick={() => handleTabClick('notifications')}
+  className="animate__animated animate__fadeIn me-2 position-relative"
+  style={{ animationDelay: '0.2s' }}
+  aria-label="Notifications"
+>
+  <svg
+    width="20"
+    height="20"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      d="M18 8a6 6 0 0 0-12 0v5l-2 2h16l-2-2V8z"
+    />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      d="M13.73 21a2 2 0 0 1-3.46 0"
+    />
+  </svg>
+
+  {notificationCount > 0 && (
+    <Badge
+      pill
+      bg="danger"
+      className="position-absolute top-0 start-100 translate-middle"
+      style={{ fontSize: '0.7rem' }}
+    >
+      {notificationCount > 99 ? '99+' : notificationCount}
+    </Badge>
+  )}
+</Button>
+
+              </div>
               <Button
                 variant="outline-light"
                 onClick={handleLogout}
@@ -718,7 +926,7 @@ const AdminDashboard = () => {
                 <p>Monday - Saturday: 10:00 AM - 6:00 PM<br />Sunday: Closed</p>
               </div>
               <Nav className="flex-column">
-                {['overview', 'add-employee', 'employee-list', 'attendance', 'manual-attendance', 'leaves', 'paid-leaves', 'salary'].map((tab) => (
+                {['overview', 'add-employee', 'edit-employee', 'employee-list', 'block-employees', 'unblock-employees', 'teams', 'tracking', 'attendance', 'manual-attendance', 'active-attendance', 'leaves', 'paid-leaves', 'tasks', 'salary', 'relieving-letter', 'offer-letter', 'reimbursements', 'notifications', 'settings'].map((tab) => (
                   <Nav.Link
                     key={tab}
                     className={`animate__animated animate__fadeInLeft ${activeTab === tab ? 'active' : ''}`}
@@ -752,49 +960,264 @@ const AdminDashboard = () => {
               </Alert>
             )}
             {activeTab === 'overview' && (
-              <Card className="animate__animated animate__fadeInUp">
-                <Card.Body>
-                  <h3 className="mb-4 fw-bold text-primary-800">{getGreeting()}, Welcome to Fintradify!</h3>
-                  <h5 className="text-primary-600 mb-3">Attendance Dashboard</h5>
-                  <div className="mb-4 chart-container">
-                    <Bar data={chartConfig} options={chartOptions} />
+              <div>
+                <Card className="animate__animated animate__fadeInUp mb-4">
+                  <Card.Body>
+                    <h3 className="mb-4 fw-bold text-primary-800">{getGreeting()}, Welcome to Fintradify!</h3>
+                    <h5 className="text-primary-600 mb-3">Admin Charts Dashboard</h5>
+                  </Card.Body>
+                </Card>
+
+                <div className="row">
+                  {/* Chart 1: Bar Chart - Attendance Overview */}
+                  <div className="col-lg-6 col-md-12 mb-4">
+                    <Card className="animate__animated animate__fadeInUp h-100">
+                      <Card.Body>
+                        <h5 className="text-primary-600 mb-3">1. Attendance Overview (Bar Chart)</h5>
+                        <div className="chart-container">
+                          <Bar data={chartConfig} options={chartOptions} />
+                        </div>
+                      </Card.Body>
+                    </Card>
                   </div>
-                  <h5 className="text-primary-600 mb-3">Summary Statistics</h5>
-                  <div className="row">
-                    <div className="col-md-4 mb-3">
-                      <Card className="text-center">
-                        <Card.Body>
-                          <h6 className="text-primary-800">Total Employees</h6>
-                          <p className="fs-4 text-primary-600">{chartData.reduce((max, curr) => Math.max(max, curr.employeesPresent), 0)}</p>
-                        </Card.Body>
-                      </Card>
-                    </div>
-                    <div className="col-md-4 mb-3">
-                      <Card className="text-center">
-                        <Card.Body>
-                          <h6 className="text-primary-800">Average Hours/Day</h6>
-                          <p className="fs-4 text-primary-600">
-                            {(chartData.reduce((sum, curr) => sum + curr.totalHours, 0) / chartData.length || 0).toFixed(1)}
-                          </p>
-                        </Card.Body>
-                      </Card>
-                    </div>
-                    <div className="col-md-4 mb-3">
-                      <Card className="text-center">
-                        <Card.Body>
-                          <h6 className="text-primary-800">Attendance Rate</h6>
-                          <p className="fs-4 text-primary-600">
-                            {((chartData.reduce((sum, curr) => sum + curr.employeesPresent, 0) / (chartData.length * 10)) * 100 || 70).toFixed(1)}%
-                          </p>
-                        </Card.Body>
-                      </Card>
-                    </div>
+
+                  {/* Chart 2: Line Chart - Employee Trends */}
+                  <div className="col-lg-6 col-md-12 mb-4">
+                    <Card className="animate__animated animate__fadeInUp h-100">
+                      <Card.Body>
+                        <h5 className="text-primary-600 mb-3">2. Employee Trends (Line Chart)</h5>
+                        <div className="chart-container">
+                          <Line
+                            data={{
+                              labels: chartData.map((item) => item.date),
+                              datasets: [
+                                {
+                                  label: 'Employees Present',
+                                  data: chartData.map((item) => item.employeesPresent),
+                                  borderColor: '#1e40af',
+                                  backgroundColor: 'rgba(30, 64, 175, 0.1)',
+                                  fill: true,
+                                  tension: 0.4,
+                                },
+                              ],
+                            }}
+                            options={{
+                              responsive: true,
+                              maintainAspectRatio: false,
+                              scales: {
+                                x: {
+                                  grid: { color: '#bfdbfe' },
+                                  ticks: { color: '#1e40af' },
+                                },
+                                y: {
+                                  grid: { color: '#bfdbfe' },
+                                  ticks: { color: '#1e40af', beginAtZero: true },
+                                },
+                              },
+                              plugins: {
+                                legend: { labels: { color: '#1e40af' } },
+                                tooltip: {
+                                  backgroundColor: '#f8fafc',
+                                  titleColor: '#1e40af',
+                                  bodyColor: '#1e40af',
+                                  borderColor: '#bfdbfe',
+                                  borderWidth: 1,
+                                  cornerRadius: 6,
+                                },
+                              },
+                            }}
+                          />
+                        </div>
+                      </Card.Body>
+                    </Card>
                   </div>
-                  {Object.keys(overview).length === 0 && !error && (
-                    <p className="text-muted mt-4">No attendance data available.</p>
-                  )}
-                  {Object.keys(overview).sort((a, b) => new Date(b) - new Date(a)).map((date) => (
-                    <div key={date} className="mb-5">
+
+                  {/* Chart 3: Pie Chart - Leave Distribution */}
+                  <div className="col-lg-6 col-md-12 mb-4">
+                    <Card className="animate__animated animate__fadeInUp h-100">
+                      <Card.Body>
+                        <h5 className="text-primary-600 mb-3">3. Leave Distribution (Pie Chart)</h5>
+                        <div className="chart-container">
+                          <Pie
+                            data={{
+                              labels: ['Approved Leaves', 'Pending Leaves', 'Rejected Leaves'],
+                              datasets: [
+                                {
+                                  data: [45, 12, 8], // Sample data - can be made dynamic
+                                  backgroundColor: ['#10b981', '#f59e0b', '#dc2626'],
+                                  borderColor: ['#10b981', '#f59e0b', '#dc2626'],
+                                  borderWidth: 1,
+                                },
+                              ],
+                            }}
+                            options={{
+                              responsive: true,
+                              maintainAspectRatio: false,
+                              plugins: {
+                                legend: {
+                                  labels: { color: '#1e40af' },
+                                  position: 'bottom',
+                                },
+                                tooltip: {
+                                  backgroundColor: '#f8fafc',
+                                  titleColor: '#1e40af',
+                                  bodyColor: '#1e40af',
+                                  borderColor: '#bfdbfe',
+                                  borderWidth: 1,
+                                  cornerRadius: 6,
+                                },
+                              },
+                            }}
+                          />
+                        </div>
+                      </Card.Body>
+                    </Card>
+                  </div>
+
+                  {/* Chart 4: Doughnut Chart - Department Stats */}
+                  <div className="col-lg-6 col-md-12 mb-4">
+                    <Card className="animate__animated animate__fadeInUp h-100">
+                      <Card.Body>
+                        <h5 className="text-primary-600 mb-3">4. Department Stats (Doughnut Chart)</h5>
+                        <div className="chart-container">
+                          <Doughnut
+                            data={{
+                              labels: ['IT', 'HR', 'Finance', 'Operations', 'Marketing'],
+                              datasets: [
+                                {
+                                  data: [25, 15, 10, 20, 15], // Sample data - can be made dynamic
+                                  backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'],
+                                  borderColor: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'],
+                                  borderWidth: 1,
+                                },
+                              ],
+                            }}
+                            options={{
+                              responsive: true,
+                              maintainAspectRatio: false,
+                              plugins: {
+                                legend: {
+                                  labels: { color: '#1e40af' },
+                                  position: 'bottom',
+                                },
+                                tooltip: {
+                                  backgroundColor: '#f8fafc',
+                                  titleColor: '#1e40af',
+                                  bodyColor: '#1e40af',
+                                  borderColor: '#bfdbfe',
+                                  borderWidth: 1,
+                                  cornerRadius: 6,
+                                },
+                              },
+                            }}
+                          />
+                        </div>
+                      </Card.Body>
+                    </Card>
+                  </div>
+
+                  {/* Chart 5: Line Chart - Salary Trends */}
+                  <div className="col-lg-12 mb-4">
+                    <Card className="animate__animated animate__fadeInUp">
+                      <Card.Body>
+                        <h5 className="text-primary-600 mb-3">5. Salary Trends (Line Chart)</h5>
+                        <div className="chart-container">
+                          <Line
+                            data={{
+                              labels: chartData.map((item) => item.date),
+                              datasets: [
+                                {
+                                  label: 'Total Hours',
+                                  data: chartData.map((item) => item.totalHours),
+                                  borderColor: '#8b5cf6',
+                                  backgroundColor: 'rgba(139, 92, 246, 0.3)',
+                                  fill: true,
+                                  tension: 0.4,
+                                },
+                                {
+                                  label: 'Average Hours',
+                                  data: chartData.map(() => 40), // 40 hours/week target
+                                  borderColor: '#06b6d4',
+                                  backgroundColor: 'rgba(6, 182, 212, 0.2)',
+                                  fill: true,
+                                  tension: 0.4,
+                                },
+                              ],
+                            }}
+                            options={{
+                              responsive: true,
+                              maintainAspectRatio: false,
+                              scales: {
+                                x: {
+                                  grid: { color: '#bfdbfe' },
+                                  ticks: { color: '#1e40af' },
+                                },
+                                y: {
+                                  grid: { color: '#bfdbfe' },
+                                  ticks: { color: '#1e40af', beginAtZero: true },
+                                },
+                              },
+                              plugins: {
+                                legend: { labels: { color: '#1e40af' } },
+                                tooltip: {
+                                  backgroundColor: '#f8fafc',
+                                  titleColor: '#1e40af',
+                                  bodyColor: '#1e40af',
+                                  borderColor: '#bfdbfe',
+                                  borderWidth: 1,
+                                  cornerRadius: 6,
+                                },
+                              },
+                            }}
+                          />
+                        </div>
+                      </Card.Body>
+                    </Card>
+                  </div>
+                </div>
+
+                <Card className="animate__animated animate__fadeInUp mb-4">
+                  <Card.Body>
+                    <h5 className="text-primary-600 mb-3">Summary Statistics</h5>
+                    <div className="row">
+                      <div className="col-md-4 mb-3">
+                        <Card className="text-center">
+                          <Card.Body>
+                            <h6 className="text-primary-800">Total Employees</h6>
+                            <p className="fs-4 text-primary-600">{chartData.reduce((max, curr) => Math.max(max, curr.employeesPresent), 0)}</p>
+                          </Card.Body>
+                        </Card>
+                      </div>
+                      <div className="col-md-4 mb-3">
+                        <Card className="text-center">
+                          <Card.Body>
+                            <h6 className="text-primary-800">Average Hours/Day</h6>
+                            <p className="fs-4 text-primary-600">
+                              {(chartData.reduce((sum, curr) => sum + curr.totalHours, 0) / chartData.length || 0).toFixed(1)}
+                            </p>
+                          </Card.Body>
+                        </Card>
+                      </div>
+                      <div className="col-md-4 mb-3">
+                        <Card className="text-center">
+                          <Card.Body>
+                            <h6 className="text-primary-800">Attendance Rate</h6>
+                            <p className="fs-4 text-primary-600">
+                              {((chartData.reduce((sum, curr) => sum + curr.employeesPresent, 0) / (chartData.length * 10)) * 100 || 70).toFixed(1)}%
+                            </p>
+                          </Card.Body>
+                        </Card>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+
+                {Object.keys(overview).length === 0 && !error && (
+                  <p className="text-muted mt-4">No attendance data available.</p>
+                )}
+                {Object.keys(overview).sort((a, b) => new Date(b) - new Date(a)).map((date) => (
+                  <Card key={date} className="animate__animated animate__fadeInUp mb-4">
+                    <Card.Body>
                       <h5 className="text-primary-600 mb-3">{date}</h5>
                       <div className="table-responsive">
                         <Table className="table table-bordered table-hover">
@@ -820,15 +1243,23 @@ const AdminDashboard = () => {
                           </tbody>
                         </Table>
                       </div>
-                    </div>
-                  ))}
-                </Card.Body>
-              </Card>
+                    </Card.Body>
+                  </Card>
+                ))}
+              </div>
             )}
             {activeTab === 'add-employee' && (
               <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.1s' }}>
                 <Card.Body>
                   <h3 className="mb-4 fw-bold text-primary-800">Add Employee</h3>
+                  <EmployeeForm />
+                </Card.Body>
+              </Card>
+            )}
+            {activeTab === 'edit-employee' && (
+              <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.15s' }}>
+                <Card.Body>
+                  <h3 className="mb-4 fw-bold text-primary-800">Edit Employee</h3>
                   <EmployeeForm />
                 </Card.Body>
               </Card>
@@ -865,6 +1296,22 @@ const AdminDashboard = () => {
                 </Card.Body>
               </Card>
             )}
+            {activeTab === 'approved-attendance' && (
+              <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.35s' }}>
+                <Card.Body>
+                  <h3 className="mb-4 fw-bold text-primary-800">Approved Attendance</h3>
+                  <AttendanceList status="approved" />
+                </Card.Body>
+              </Card>
+            )}
+            {activeTab === 'rejected-attendance' && (
+              <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.35s' }}>
+                <Card.Body>
+                  <h3 className="mb-4 fw-bold text-primary-800">Rejected Attendance</h3>
+                  <AttendanceList status="rejected" />
+                </Card.Body>
+              </Card>
+            )}
             {activeTab === 'leaves' && (
               <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.4s' }}>
                 <Card.Body>
@@ -881,6 +1328,14 @@ const AdminDashboard = () => {
                 </Card.Body>
               </Card>
             )}
+            {activeTab === 'active-attendance' && (
+              <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.45s' }}>
+                <Card.Body>
+                  <h3 className="mb-4 fw-bold text-primary-800">Active Attendances</h3>
+                  <ActiveAttendance />
+                </Card.Body>
+              </Card>
+            )}
             {activeTab === 'paid-leaves' && (
               <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.5s' }}>
                 <Card.Body>
@@ -889,11 +1344,74 @@ const AdminDashboard = () => {
                 </Card.Body>
               </Card>
             )}
+            {activeTab === 'tasks' && (
+              <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.5s' }}>
+                <Card.Body>
+                  <AdminTasks />
+                </Card.Body>
+              </Card>
+            )}
             {activeTab === 'salary' && (
               <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.6s' }}>
                 <Card.Body>
                   <h3 className="mb-4 fw-bold text-primary-800">Salary Slips</h3>
                   <SalarySlip isAdmin />
+                </Card.Body>
+              </Card>
+            )}
+            {activeTab === 'relieving-letter' && (
+              <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.65s' }}>
+                <Card.Body>
+                  <h3 className="mb-4 fw-bold text-primary-800">Relieving Letters</h3>
+                  <RelievingLetter />
+                </Card.Body>
+              </Card>
+            )}
+            {activeTab === 'offer-letter' && (
+              <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.65s' }}>
+                <Card.Body>
+                  <h3 className="mb-4 fw-bold text-primary-800">Offer Letters</h3>
+                  <OfferLetter />
+                </Card.Body>
+              </Card>
+            )}
+            {activeTab === 'reimbursements' && (
+              <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.65s' }}>
+                <Card.Body>
+                  <h3 className="mb-4 fw-bold text-primary-800">Reimbursements</h3>
+                  <AdminReimbursement />
+                </Card.Body>
+              </Card>
+            )}
+            {activeTab === 'notifications' && (
+              <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.65s' }}>
+                <Card.Body>
+                  <h3 className="mb-4 fw-bold text-primary-800">Notifications</h3>
+                  <Notification userId={profile._id} role="admin" />
+                </Card.Body>
+              </Card>
+            )}
+            {activeTab === 'teams' && (
+              <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.25s' }}>
+                <Card.Body>
+                  <h3 className="mb-4 fw-bold text-primary-800">Employee Teams</h3>
+                  <EmployeeTeams />
+                </Card.Body>
+              </Card>
+            )}
+            {activeTab === 'tracking' && (
+              <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.25s' }}>
+                <Card.Body>
+                  <h3 className="mb-4 fw-bold text-primary-800">Employee Tracking</h3>
+                  <EmployeeTracking />
+                </Card.Body>
+              </Card>
+            )}
+            {activeTab === 'settings' && (
+              <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.7s' }}>
+                <Card.Body>
+                  <h3 className="mb-4 fw-bold text-primary-800">Settings</h3>
+                  <AdminSettings />
                 </Card.Body>
               </Card>
             )}

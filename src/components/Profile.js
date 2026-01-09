@@ -5,7 +5,9 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import 'animate.css';
 
 const Profile = () => {
-  const [formData, setFormData] = useState({ name: '', email: '', phone: '', position: '', password: '' });
+  const [formData, setFormData] = useState({ name: '', email: '', phone: '', address: '', position: '', password: '', profilePhoto: '' });
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [preview, setPreview] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
@@ -15,7 +17,7 @@ const Profile = () => {
     const fetchProfile = async () => {
       try {
         console.log('Fetching profile for editing...');
-        const res = await axios.get(`${process.env.REACT_APP_API_URL}/employees/me`, {
+        const res = await axios.get(`${process.env.REACT_APP_API_URL}/employees/profile`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
           signal: abortController.signal,
         });
@@ -23,8 +25,10 @@ const Profile = () => {
           name: res.data.name || '',
           email: res.data.email || '',
           phone: res.data.phone || '',
+          address: res.data.address || '',
           position: res.data.position || '',
           password: '',
+          profilePhoto: res.data.profilePhoto || '',
         });
         setError('');
       } catch (err) {
@@ -40,26 +44,59 @@ const Profile = () => {
     return () => abortController.abort();
   }, []);
 
+
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    setSelectedFile(file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => setPreview(reader.result);
+      reader.readAsDataURL(file);
+    } else {
+      setPreview('');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      console.log('Updating profile:', formData);
+      let photoUrl = formData.profilePhoto || '';
+      if (selectedFile) {
+        const formDataUpload = new FormData();
+        formDataUpload.append('photo', selectedFile);
+        const uploadRes = await axios.post(
+          `${process.env.REACT_APP_API_URL}/employees/upload-photo`,
+          formDataUpload,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('token')}`,
+              'Content-Type': 'multipart/form-data',
+            },
+          }
+        );
+        photoUrl = uploadRes.data.photoUrl;
+      }
+      const updateData = { ...formData, profilePhoto: photoUrl };
+      console.log('Updating profile:', updateData);
       await axios.put(
-        `${process.env.REACT_APP_API_URL}/employees/me`,
-        formData,
+        `${process.env.REACT_APP_API_URL}/employees/profile`,
+        updateData,
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
       setMessage('Profile updated successfully');
       setError('');
+      setSelectedFile(null);
+      setPreview('');
     } catch (err) {
       console.error('Update profile error:', err.response?.status, err.response?.data);
       setError(err.response?.data?.message || 'Error updating profile');
       setMessage('');
     }
-  };
-
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   return (
@@ -314,7 +351,6 @@ const Profile = () => {
                   value={formData.email}
                   onChange={handleChange}
                   required
-                  disabled
                 />
               </Form.Group>
               <Form.Group controlId="phone" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.4s' }}>
@@ -331,6 +367,23 @@ const Profile = () => {
                   onChange={handleChange}
                 />
               </Form.Group>
+              <Form.Group controlId="address" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.45s' }}>
+                <Form.Label>
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Address
+                </Form.Label>
+                <Form.Control
+                  as="textarea"
+                  rows={3}
+                  name="address"
+                  value={formData.address}
+                  onChange={handleChange}
+                  placeholder="Enter your full address"
+                />
+              </Form.Group>
               <Form.Group controlId="position" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.5s' }}>
                 <Form.Label>
                   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -343,7 +396,6 @@ const Profile = () => {
                   name="position"
                   value={formData.position}
                   onChange={handleChange}
-                  disabled
                 />
               </Form.Group>
               <Form.Group controlId="password" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.6s' }}>
@@ -360,6 +412,34 @@ const Profile = () => {
                   onChange={handleChange}
                   placeholder="Enter new password or leave blank"
                 />
+              </Form.Group>
+              <Form.Group controlId="photo" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.7s' }}>
+                <Form.Label>
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Profile Photo
+                </Form.Label>
+                <Form.Control
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                />
+                {preview && (
+                  <div style={{ marginTop: '1rem' }}>
+                    <img
+                      src={preview}
+                      alt="Preview"
+                      style={{
+                        width: '100px',
+                        height: '100px',
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        border: '2px solid #1e40af'
+                      }}
+                    />
+                  </div>
+                )}
               </Form.Group>
               <Button
                 variant="primary"

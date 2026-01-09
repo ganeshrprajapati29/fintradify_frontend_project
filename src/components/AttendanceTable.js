@@ -11,6 +11,9 @@ const AttendanceTable = ({ isEmployee }) => {
   const [endDate, setEndDate] = useState('');
   const [error, setError] = useState('');
   const [punchStatus, setPunchStatus] = useState({ canPunchIn: true, canPunchOut: false });
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingAttendance, setEditingAttendance] = useState(null);
+  const [editForm, setEditForm] = useState({ punchIn: '', punchOut: '', holiday: false });
 
   const fetchAttendance = async () => {
     try {

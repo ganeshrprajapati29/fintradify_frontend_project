@@ -1,18 +1,18 @@
 import axios from 'axios';
 
 const instance = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'https://cms-r0ig.onrender.com/api', // Fallback for development
-  // timeout: 10000,  // Removed timeout to avoid issues
+  baseURL: process.env.REACT_APP_API_URL || 'https://crm.fintradify.com/api', // Fallback for development
+  timeout: 10000,
 });
 
 instance.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     if (token) {
-      config.headers['x-auth-token'] = token;
+      config.headers['Authorization'] = `Bearer ${token}`;
     }
     console.log('Axios request:', config.method.toUpperCase(), config.url, {
-      headers: { 'x-auth-token': token || 'none' },
+      headers: { 'Authorization': token ? `Bearer ${token}` : 'none' },
       data: config.data,
     });
     return config;

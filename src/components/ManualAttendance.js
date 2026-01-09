@@ -1,19 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { Form, Button, Alert, Card, Row, Col } from 'react-bootstrap';
+import { Form, Button, Alert, Card, Row, Col, Table, Modal } from 'react-bootstrap';
 import axios from 'axios';
+import moment from 'moment';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'animate.css';
 
 const ManualAttendance = () => {
   const [employees, setEmployees] = useState([]);
+  const [attendances, setAttendances] = useState([]);
+  const [startDate, setStartDate] = useState(moment().format('YYYY-MM-DD'));
+  const [endDate, setEndDate] = useState(moment().format('YYYY-MM-DD'));
   const [formData, setFormData] = useState({
     employeeId: '',
-    date: '',
+    date: moment().format('YYYY-MM-DD'),
     punchIn: '',
     punchOut: '',
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingAttendance, setEditingAttendance] = useState(null);
+  const [editForm, setEditForm] = useState({ punchIn: '', punchOut: '', holiday: false, halfDay: false });
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const fetchEmployees = async () => {
@@ -28,7 +36,27 @@ const ManualAttendance = () => {
       }
     };
     fetchEmployees();
+    fetchAttendances();
   }, []);
+
+  const fetchAttendances = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(`${process.env.REACT_APP_API_URL}/attendance?startDate=${startDate}&endDate=${endDate}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      setAttendances(res.data);
+    } catch (err) {
+      console.error('Error fetching attendances:', err);
+      setError('Failed to fetch attendances');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAttendances();
+  }, [startDate, endDate]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -56,16 +84,67 @@ const ManualAttendance = () => {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       });
 
-      setSuccess('Manual attendance recorded successfully');
+      setSuccess('Manual attendance recorded/updated successfully');
+
       setFormData({
         employeeId: '',
-        date: '',
+        date: moment().format('YYYY-MM-DD'),
         punchIn: '',
         punchOut: '',
       });
+      fetchAttendances();
     } catch (err) {
       console.error('Error recording manual attendance:', err);
       setError(err.response?.data?.message || 'Failed to record manual attendance');
+    }
+  };
+
+  const handleEdit = (attendance) => {
+    setEditingAttendance(attendance);
+    setEditForm({
+      punchIn: attendance.punchIn ? moment(attendance.punchIn).format('HH:mm') : '',
+      punchOut: attendance.punchOut ? moment(attendance.punchOut).format('HH:mm') : '',
+      holiday: attendance.holiday || false,
+      halfDay: attendance.halfDay || false,
+    });
+    setShowEditModal(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this attendance record?')) {
+      try {
+        await axios.delete(`${process.env.REACT_APP_API_URL}/attendance/admin/delete/${id}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        });
+        setSuccess('Attendance record deleted successfully');
+        fetchAttendances();
+      } catch (err) {
+        console.error('Delete error:', err);
+        setError(err.response?.data?.message || 'Failed to delete attendance');
+      }
+    }
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        punchIn: editForm.punchIn ? `${editingAttendance.date.split('T')[0]}T${editForm.punchIn}:00` : null,
+        punchOut: editForm.punchOut ? `${editingAttendance.date.split('T')[0]}T${editForm.punchOut}:00` : null,
+        holiday: editForm.holiday,
+        halfDay: editForm.halfDay,
+      };
+
+      await axios.put(`${process.env.REACT_APP_API_URL}/attendance/admin/edit/${editingAttendance._id}`, payload, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+
+      setSuccess('Attendance updated successfully');
+      setShowEditModal(false);
+      fetchAttendances();
+    } catch (err) {
+      console.error('Edit error:', err);
+      setError(err.response?.data?.message || 'Failed to update attendance');
     }
   };
 
@@ -299,6 +378,143 @@ const ManualAttendance = () => {
             </Form>
           </Card.Body>
         </Card>
+        <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.3s' }}>
+          <Card.Body>
+            <h4 className="mb-3">All Employee Attendances</h4>
+            <Form className="mb-3">
+              <Row>
+                <Col md={6}>
+                  <Form.Group controlId="startDate">
+                    <Form.Label>Start Date</Form.Label>
+                    <Form.Control
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group controlId="endDate">
+                    <Form.Label>End Date</Form.Label>
+                    <Form.Control
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+            </Form>
+            <div className="table-responsive">
+              <Table striped bordered hover className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.4s' }}>
+                <thead>
+                  <tr>
+                    <th>Employee ID</th>
+                    <th>Name</th>
+                    <th>Date</th>
+                    <th>Punch In</th>
+                    <th>Punch Out</th>
+                    <th>Holiday</th>
+                    <th>Half Day</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan="8" className="text-center">
+                        <div className="d-flex justify-content-center align-items-center">
+                          <div className="spinner-border spinner-border-sm text-primary me-2" role="status">
+                            <span className="visually-hidden">Loading...</span>
+                          </div>
+                          Loading attendances...
+                        </div>
+                      </td>
+                    </tr>
+                  ) : attendances.length > 0 ? (
+                    attendances.map((att, index) => (
+                      <tr key={att._id} className="animate__animated animate__fadeIn" style={{ animationDelay: `${0.05 * index}s` }}>
+                        <td>{att.employee?.employeeId || 'N/A'}</td>
+                        <td>{att.employee?.name || 'N/A'}</td>
+                        <td>{moment(att.date).format('YYYY-MM-DD')}</td>
+                        <td>{att.punchIn ? moment(att.punchIn).format('HH:mm:ss') : '-'}</td>
+                        <td>{att.punchOut ? moment(att.punchOut).format('HH:mm:ss') : '-'}</td>
+                        <td>{att.holiday ? 'Yes' : 'No'}</td>
+                        <td>{att.halfDay ? 'Yes' : 'No'}</td>
+                        <td>
+                          <Button variant="warning" size="sm" onClick={() => handleEdit(att)} className="me-2">
+                            Edit
+                          </Button>
+                          <Button variant="danger" size="sm" onClick={() => handleDelete(att._id)}>
+                            Delete
+                          </Button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="8" className="text-center">No attendance records available</td>
+                    </tr>
+                  )}
+                </tbody>
+              </Table>
+            </div>
+          </Card.Body>
+        </Card>
+        <Modal show={showEditModal} onHide={() => setShowEditModal(false)}>
+          <Modal.Header closeButton>
+            <Modal.Title>Edit Attendance</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <Form onSubmit={handleEditSubmit}>
+              <Row>
+                <Col md={6}>
+                  <Form.Group controlId="editPunchIn" className="mb-3">
+                    <Form.Label>Punch In Time</Form.Label>
+                    <Form.Control
+                      type="time"
+                      value={editForm.punchIn}
+                      onChange={(e) => setEditForm({ ...editForm, punchIn: e.target.value })}
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group controlId="editPunchOut" className="mb-3">
+                    <Form.Label>Punch Out Time</Form.Label>
+                    <Form.Control
+                      type="time"
+                      value={editForm.punchOut}
+                      onChange={(e) => setEditForm({ ...editForm, punchOut: e.target.value })}
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+              <Row>
+                <Col md={6}>
+                  <Form.Check
+                    type="checkbox"
+                    label="Holiday"
+                    checked={editForm.holiday}
+                    onChange={(e) => setEditForm({ ...editForm, holiday: e.target.checked })}
+                  />
+                </Col>
+                <Col md={6}>
+                  <Form.Check
+                    type="checkbox"
+                    label="Half Day"
+                    checked={editForm.halfDay}
+                    onChange={(e) => setEditForm({ ...editForm, halfDay: e.target.checked })}
+                  />
+                </Col>
+              </Row>
+              <div className="text-center mt-3">
+                <Button variant="primary" type="submit">
+                  Update Attendance
+                </Button>
+              </div>
+            </Form>
+          </Modal.Body>
+        </Modal>
       </div>
     </div>
   );

@@ -9,11 +9,18 @@ const EmployeeForm = ({ employee, isEmployee }) => {
     name: employee ? employee.name : '',
     email: employee ? employee.email : '',
     phone: employee ? employee.phone : '',
+    address: employee ? employee.address || '' : '',
     position: employee ? employee.position : '',
+    department: employee ? employee.department || '' : '',
+    bankAccount: employee ? employee.bankAccount || '' : '',
+    bankName: employee ? employee.bankName || '' : '',
     salary: employee && employee.salary !== 'N/A' ? employee.salary : '',
     joiningDate: employee ? (employee.joiningDate ? new Date(employee.joiningDate).toISOString().split('T')[0] : '') : '',
     password: '',
+    profilePhoto: employee ? employee.profilePhoto : '',
   });
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(employee ? employee.profilePhoto : '');
   const [error, setError] = useState('');
   const [employees, setEmployees] = useState([]);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -44,12 +51,32 @@ const EmployeeForm = ({ employee, isEmployee }) => {
       return;
     }
     try {
-      await axios.post(
+      const res = await axios.post(
         `${process.env.REACT_APP_API_URL}/employees`,
         formData,
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
-      setFormData({ name: '', email: '', phone: '', position: '', salary: '', joiningDate: '', password: '' });
+
+      // Upload photo if selected
+      if (selectedFile) {
+        const formDataUpload = new FormData();
+        formDataUpload.append('photo', selectedFile);
+
+        await axios.post(
+          `${process.env.REACT_APP_API_URL}/employees/${res.data._id}/upload-photo`,
+          formDataUpload,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('token')}`,
+// Content-Type will be set automatically for FormData
+            },
+          }
+        );
+      }
+
+      setFormData({ name: '', email: '', phone: '', position: '', department: '', bankAccount: '', bankName: '', salary: '', joiningDate: '', password: '', profilePhoto: '' });
+      setSelectedFile(null);
+      setPhotoPreview('');
       fetchEmployees();
       setError('');
       alert('Employee added successfully');
@@ -65,28 +92,63 @@ const EmployeeForm = ({ employee, isEmployee }) => {
       name: emp.name,
       email: emp.email,
       phone: emp.phone,
+      address: emp.address || '',
       position: emp.position,
+      department: emp.department || '',
+      bankAccount: emp.bankAccount || '',
+      bankName: emp.bankName || '',
       salary: emp.salary !== 'N/A' ? emp.salary : '',
       joiningDate: emp.joiningDate ? new Date(emp.joiningDate).toISOString().split('T')[0] : '',
       password: '',
+      profilePhoto: emp.profilePhoto || '',
     });
+    setPhotoPreview(emp.profilePhoto || '');
+    setSelectedFile(null);
     setShowEditModal(true);
   };
 
   const handleUpdate = async (e) => {
     e.preventDefault();
     try {
-      await axios.put(
+      let photoUrl = formData.profilePhoto;
+
+      // Upload photo to server if a new file is selected
+      if (selectedFile) {
+        const formDataUpload = new FormData();
+        formDataUpload.append('photo', selectedFile);
+
+        const uploadResponse = await axios.post(
+          isEmployee
+            ? `${process.env.REACT_APP_API_URL}/employees/upload-photo`
+            : `${process.env.REACT_APP_API_URL}/employees/${selectedEmployee._id}/upload-photo`,
+          formDataUpload,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('token')}`,
+              'Content-Type': 'multipart/form-data',
+            },
+          }
+        );
+        photoUrl = uploadResponse.data.photoUrl;
+      }
+
+      const updateData = { ...formData, profilePhoto: photoUrl };
+
+      const response = await axios.put(
         isEmployee
           ? `${process.env.REACT_APP_API_URL}/employees/profile`
           : `${process.env.REACT_APP_API_URL}/employees/${selectedEmployee._id}`,
-        formData,
+        updateData,
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
       setShowEditModal(false);
-      fetchEmployees();
+      if (!isEmployee) {
+        fetchEmployees(); // Only fetch employee list for admins
+      }
       setError('');
-      alert('Profile updated successfully');
+      setSelectedFile(null);
+      setPhotoPreview(photoUrl);
+      alert(response.data.message || 'Profile updated successfully');
     } catch (err) {
       console.error('Update employee error:', err);
       setError(err.response?.data?.message || 'Error updating profile');
@@ -115,6 +177,18 @@ const EmployeeForm = ({ employee, isEmployee }) => {
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    setSelectedFile(file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => setPhotoPreview(e.target.result);
+      reader.readAsDataURL(file);
+    } else {
+      setPhotoPreview('');
+    }
   };
 
   return (
@@ -452,6 +526,23 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                   required
                 />
               </Form.Group>
+              <Form.Group controlId="address" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.35s' }}>
+                <Form.Label>
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Address
+                </Form.Label>
+                <Form.Control
+                  as="textarea"
+                  rows={3}
+                  name="address"
+                  value={formData.address}
+                  onChange={handleChange}
+                  placeholder="Enter full address"
+                />
+              </Form.Group>
               <Form.Group controlId="position" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.4s' }}>
                 <Form.Label>
                   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -465,6 +556,38 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                   value={formData.position}
                   onChange={handleChange}
                   required
+                  disabled={isEmployee}
+                />
+              </Form.Group>
+              <Form.Group controlId="department" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.45s' }}>
+                <Form.Label>
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                  Department
+                </Form.Label>
+                <Form.Control
+                  type="text"
+                  name="department"
+                  value={formData.department}
+                  onChange={handleChange}
+                  placeholder="Enter department"
+                  disabled={isEmployee}
+                />
+              </Form.Group>
+              <Form.Group controlId="bankAccount" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.5s' }}>
+                <Form.Label>
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                  </svg>
+                  Bank Account
+                </Form.Label>
+                <Form.Control
+                  type="text"
+                  name="bankAccount"
+                  value={formData.bankAccount}
+                  onChange={handleChange}
+                  placeholder="Enter bank account number"
                   disabled={isEmployee}
                 />
               </Form.Group>
@@ -564,6 +687,23 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                   required
                 />
               </Form.Group>
+              <Form.Group controlId="address" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.35s' }}>
+                <Form.Label>
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Address
+                </Form.Label>
+                <Form.Control
+                  as="textarea"
+                  rows={3}
+                  name="address"
+                  value={formData.address}
+                  onChange={handleChange}
+                  placeholder="Enter full address"
+                />
+              </Form.Group>
               <Form.Group controlId="position" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.4s' }}>
                 <Form.Label>
                   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -579,7 +719,52 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                   required
                 />
               </Form.Group>
-              <Form.Group controlId="joiningDate" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.45s' }}>
+              <Form.Group controlId="department" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.45s' }}>
+                <Form.Label>
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                  Department
+                </Form.Label>
+                <Form.Control
+                  type="text"
+                  name="department"
+                  value={formData.department}
+                  onChange={handleChange}
+                  placeholder="Enter department"
+                />
+              </Form.Group>
+              <Form.Group controlId="bankAccount" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.5s' }}>
+                <Form.Label>
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                  </svg>
+                  Bank Account
+                </Form.Label>
+                <Form.Control
+                  type="text"
+                  name="bankAccount"
+                  value={formData.bankAccount}
+                  onChange={handleChange}
+                  placeholder="Enter bank account number"
+                />
+              </Form.Group>
+              <Form.Group controlId="bankName" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.525s' }}>
+                <Form.Label>
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                  Bank Name
+                </Form.Label>
+                <Form.Control
+                  type="text"
+                  name="bankName"
+                  value={formData.bankName}
+                  onChange={handleChange}
+                  placeholder="Enter bank name"
+                />
+              </Form.Group>
+              <Form.Group controlId="joiningDate" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.55s' }}>
                 <Form.Label>
                   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -626,6 +811,34 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                   placeholder="Leave blank to generate random password"
                 />
               </Form.Group>
+              <Form.Group controlId="profilePhoto" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.65s' }}>
+                <Form.Label>
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Profile Photo
+                </Form.Label>
+                <Form.Control
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                />
+                {photoPreview && (
+                  <div className="mt-2">
+                    <img
+                      src={photoPreview}
+                      alt="Preview"
+                      style={{
+                        width: '80px',
+                        height: '80px',
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        border: '2px solid #1e40af'
+                      }}
+                    />
+                  </div>
+                )}
+              </Form.Group>
               <Button
                 variant="primary"
                 type="submit"
@@ -650,6 +863,8 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                     <th>Phone</th>
                     <th>Position</th>
                     <th>Salary (₹)</th>
+                    <th>Paid Leaves</th>
+                    <th>Unpaid Leaves</th>
                     <th>Action</th>
                   </tr>
                 </thead>
@@ -662,7 +877,9 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                         <td>{emp.email}</td>
                         <td>{emp.phone}</td>
                         <td>{emp.position}</td>
-                        <td>{emp.salary !== 'N/A' ? `₹${parseFloat(emp.salary).toFixed(2)}` : 'N/A'}</td>
+                        <td>{emp.salary && typeof emp.salary === 'number' && !isNaN(emp.salary) ? `₹${emp.salary.toFixed(2)}` : 'N/A'}</td>
+                        <td>{emp.paidLeaveBalance || 0}</td>
+                        <td>{emp.unpaidLeaveBalance || 6}</td>
                         <td>
                           <Button
                             variant="warning"
@@ -690,7 +907,7 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="7" className="table-empty">No employees available</td>
+                      <td colSpan="9" className="table-empty">No employees available</td>
                     </tr>
                   )}
                 </tbody>
@@ -750,6 +967,23 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                   required
                 />
               </Form.Group>
+              <Form.Group controlId="address" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.35s' }}>
+                <Form.Label>
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Address
+                </Form.Label>
+                <Form.Control
+                  as="textarea"
+                  rows={3}
+                  name="address"
+                  value={formData.address}
+                  onChange={handleChange}
+                  placeholder="Enter full address"
+                />
+              </Form.Group>
               <Form.Group controlId="position" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.4s' }}>
                 <Form.Label>
                   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -765,7 +999,52 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                   required
                 />
               </Form.Group>
-              <Form.Group controlId="joiningDate" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.45s' }}>
+              <Form.Group controlId="department" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.45s' }}>
+                <Form.Label>
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                  Department
+                </Form.Label>
+                <Form.Control
+                  type="text"
+                  name="department"
+                  value={formData.department}
+                  onChange={handleChange}
+                  placeholder="Enter department"
+                />
+              </Form.Group>
+              <Form.Group controlId="bankAccount" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.5s' }}>
+                <Form.Label>
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                  </svg>
+                  Bank Account
+                </Form.Label>
+                <Form.Control
+                  type="text"
+                  name="bankAccount"
+                  value={formData.bankAccount}
+                  onChange={handleChange}
+                  placeholder="Enter bank account number"
+                />
+              </Form.Group>
+              <Form.Group controlId="bankName" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.525s' }}>
+                <Form.Label>
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                  Bank Name
+                </Form.Label>
+                <Form.Control
+                  type="text"
+                  name="bankName"
+                  value={formData.bankName}
+                  onChange={handleChange}
+                  placeholder="Enter bank name"
+                />
+              </Form.Group>
+              <Form.Group controlId="joiningDate" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.55s' }}>
                 <Form.Label>
                   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
