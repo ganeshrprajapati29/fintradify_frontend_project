@@ -27,7 +27,8 @@ import {
 import AttendanceTable from './AttendanceTable';
 import LeaveRequest from './LeaveRequest';
 import SalarySlip from './SalarySlip';
-import Profile from './Profile';
+import Profile from './ProfileDisplay';
+import EmployeeForm from './EmployeeForm';
 import AttendanceCalendar from './AttendanceCalendar';
 import EmployeeSettings from './EmployeeSettings';
 import EmployeeTasks from './EmployeeTasks';
@@ -63,7 +64,7 @@ const EmployeeDashboard = () => {
         const res = await axios.get(`${process.env.REACT_APP_API_URL}/employees/profile`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
         });
-        setProfile(res.data || {});
+        setProfile(res.data.data || {});
         setError('');
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to fetch profile');
@@ -727,16 +728,28 @@ const EmployeeDashboard = () => {
               <Navbar.Brand className="animate__animated animate__zoomIn">Fintradify Employee</Navbar.Brand>
               <Navbar.Text className="ms-auto animate__animated animate__fadeIn d-none d-md-block">{currentTime}</Navbar.Text>
               <Button
-                variant="outline-light"
-                onClick={() => handleTabClick('notifications')}
-                className="animate__animated animate__fadeIn me-2"
-                style={{ animationDelay: '0.2s' }}
-                aria-label="Notifications"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                </svg>
-              </Button>
+  variant="outline-light"
+  onClick={() => handleTabClick("notifications")}
+  className="animate__animated animate__fadeIn me-2 d-flex align-items-center justify-content-center"
+  style={{ animationDelay: "0.2s" }}
+  aria-label="Notifications"
+>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+    <path d="M13.73 21a2 2 0 01-3.46 0" />
+  </svg>
+</Button>
+
               <Button
                 variant="outline-light"
                 onClick={handleLogout}
@@ -1094,7 +1107,7 @@ const EmployeeDashboard = () => {
             )}
             {activeTab === 'edit-profile' && (
               <div className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.1s' }}>
-                <Profile />
+                <EmployeeForm isEmployee={true} />
               </div>
             )}
             {activeTab === 'attendance-calendar' && (

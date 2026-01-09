@@ -28,7 +28,7 @@ const EmployeeReimbursement = () => {
       const res = await axios.get(`${process.env.REACT_APP_API_URL}/reimbursements/my`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       });
-      setReimbursements(res.data || []);
+      setReimbursements(res.data.data || []);
       setError('');
     } catch (err) {
       console.error('Fetch reimbursements error:', err.response?.status, err.response?.data);

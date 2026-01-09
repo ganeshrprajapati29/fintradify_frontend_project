@@ -41,7 +41,36 @@ const EmployeeForm = ({ employee, isEmployee }) => {
   };
 
   useEffect(() => {
-    fetchEmployees();
+    if (isEmployee) {
+      const fetchProfile = async () => {
+        try {
+          const res = await axios.get(`${process.env.REACT_APP_API_URL}/employees/profile`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+          });
+          const emp = res.data.data;
+          setFormData({
+            name: emp.name || '',
+            email: emp.email || '',
+            phone: emp.phone || '',
+            address: emp.address || '',
+            position: emp.position || '',
+            department: emp.department || '',
+            bankAccount: emp.bankAccount || '',
+            bankName: emp.bankName || '',
+            salary: emp.salary || '',
+            joiningDate: emp.joiningDate ? new Date(emp.joiningDate).toISOString().split('T')[0] : '',
+            password: '',
+            profilePhoto: emp.profilePhoto || '',
+          });
+          setPhotoPreview(emp.profilePhoto || '');
+        } catch (err) {
+          setError(err.response?.data?.message || 'Failed to fetch profile');
+        }
+      };
+      fetchProfile();
+    } else {
+      fetchEmployees();
+    }
   }, [isEmployee]);
 
   const handleSubmit = async (e) => {
@@ -556,7 +585,6 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                   value={formData.position}
                   onChange={handleChange}
                   required
-                  disabled={isEmployee}
                 />
               </Form.Group>
               <Form.Group controlId="department" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.45s' }}>
@@ -572,7 +600,6 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                   value={formData.department}
                   onChange={handleChange}
                   placeholder="Enter department"
-                  disabled={isEmployee}
                 />
               </Form.Group>
               <Form.Group controlId="bankAccount" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.5s' }}>
@@ -619,6 +646,45 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                   onChange={handleChange}
                   placeholder="Enter new password or leave blank"
                 />
+              </Form.Group>
+              <Form.Group controlId="profilePhoto" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.65s' }}>
+                <Form.Label>
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Profile Photo
+                </Form.Label>
+                <Form.Control
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                />
+                <div className="mt-2">
+                  {(photoPreview || formData.profilePhoto) ? (
+                    <img
+                      src={photoPreview || formData.profilePhoto}
+                      alt="Preview"
+                      style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: '80px',
+                        height: '80px',
+                        borderRadius: '50%',
+                        background: '#bfdbfe',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '2rem',
+                        fontWeight: 'bold',
+                        color: '#1e40af'
+                      }}
+                    >
+                      {(formData.name || 'U')[0].toUpperCase()}
+                    </div>
+                  )}
+                </div>
               </Form.Group>
               <Button
                 variant="primary"
@@ -823,8 +889,8 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                   accept="image/*"
                   onChange={handleFileChange}
                 />
-                {photoPreview && (
-                  <div className="mt-2">
+                <div className="mt-2">
+                  {photoPreview ? (
                     <img
                       src={photoPreview}
                       alt="Preview"
@@ -836,8 +902,26 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                         border: '2px solid #1e40af'
                       }}
                     />
-                  </div>
-                )}
+                  ) : (
+                    <div
+                      style={{
+                        width: '80px',
+                        height: '80px',
+                        borderRadius: '50%',
+                        background: '#bfdbfe',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '2rem',
+                        fontWeight: 'bold',
+                        color: '#1e40af',
+                        border: '2px solid #1e40af'
+                      }}
+                    >
+                      {(selectedEmployee?.name || 'U')[0].toUpperCase()}
+                    </div>
+                  )}
+                </div>
               </Form.Group>
               <Button
                 variant="primary"

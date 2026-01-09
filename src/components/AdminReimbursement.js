@@ -78,7 +78,7 @@ const AdminReimbursement = () => {
     if (!window.confirm('Are you sure you want to delete this reimbursement?')) return;
 
     try {
-      await axios.delete(`${process.env.REACT_APP_API_URL}/reimbursement/${id}`, {
+      await axios.delete(`${process.env.REACT_APP_API_URL}/reimbursements/${id}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       });
       setSuccess('Reimbursement deleted successfully');

@@ -35,7 +35,7 @@ const AdminTasks = () => {
       const res = await axios.get(`${process.env.REACT_APP_API_URL}/employees`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       });
-      setEmployees(res.data || []);
+      setEmployees(res.data.data || []);
     } catch (err) {
       console.error('Error fetching employees:', err);
     }

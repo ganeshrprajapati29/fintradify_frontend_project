@@ -15,7 +15,7 @@ const EmployeeTasks = () => {
         const res = await axios.get(`${process.env.REACT_APP_API_URL}/tasks/my-tasks`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
         });
-        setTasks(res.data || []);
+        setTasks(res.data.data || []);
         setError('');
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to fetch tasks');
