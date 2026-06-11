@@ -2,6 +2,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
 import { SettingsProvider } from './contexts/SettingsContext';
+import { PublicDataProvider } from './contexts/PublicDataContext';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import AdminPage from './pages/AdminPage';
@@ -29,31 +30,33 @@ import './styles.css';
 function App() {
   return (
     <SettingsProvider>
-      <Router>
-        <Switch>
-          <Route exact path="/" component={LandingPage} />
-          <Route path="/login" component={LoginPage} />
-          <Route path="/admin" component={AdminPage} />
-          <Route path="/employee" component={EmployeePage} />
-          <Route path="/privacy-policy" component={PrivacyPolicy} />
-          <Route path="/terms" component={TermsOfService} />
-          <Route path="/cookies" component={Cookies} />
-          <Route path="/gdpr" component={GDPR} />
-          <Route path="/features" component={Features} />
-          <Route path="/pricing" component={Pricing} />
-          <Route path="/integrations" component={Integrations} />
-          <Route path="/api" component={API} />
-          <Route path="/contact" component={Contact} />
-          <Route path="/about" component={AboutUs} />
-          <Route path="/careers" component={Careers} />
-          <Route path="/press" component={Press} />
-          <Route path="/help" component={HelpCenter} />
-          <Route path="/docs" component={Documentation} />
-          <Route path="/community" component={Community} />
-          <Route path="/status" component={Status} />
-          <Route path="/compliance" component={Compliance} />
-        </Switch>
-      </Router>
+      <PublicDataProvider>
+        <Router>
+          <Switch>
+            <Route exact path="/" component={LandingPage} />
+            <Route path="/login" component={LoginPage} />
+            <Route path="/admin" component={AdminPage} />
+            <Route path="/employee" component={EmployeePage} />
+            <Route path="/privacy-policy" component={PrivacyPolicy} />
+            <Route path="/terms" component={TermsOfService} />
+            <Route path="/cookies" component={Cookies} />
+            <Route path="/gdpr" component={GDPR} />
+            <Route path="/features" component={Features} />
+            <Route path="/pricing" component={Pricing} />
+            <Route path="/integrations" component={Integrations} />
+            <Route path="/api" component={API} />
+            <Route path="/contact" component={Contact} />
+            <Route path="/about" component={AboutUs} />
+            <Route path="/careers" component={Careers} />
+            <Route path="/press" component={Press} />
+            <Route path="/help" component={HelpCenter} />
+            <Route path="/docs" component={Documentation} />
+            <Route path="/community" component={Community} />
+            <Route path="/status" component={Status} />
+            <Route path="/compliance" component={Compliance} />
+          </Switch>
+        </Router>
+      </PublicDataProvider>
     </SettingsProvider>
   );
 }

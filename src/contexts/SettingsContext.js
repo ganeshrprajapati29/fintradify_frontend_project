@@ -58,7 +58,7 @@ export const SettingsProvider = ({ children }) => {
         const res = await axios.get(`${process.env.REACT_APP_API_URL}/settings`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setSettings(prev => ({ ...prev, ...res.data }));
+        setSettings(prev => ({ ...prev, ...(res.data?.data || res.data || {}) }));
       }
     } catch (err) {
       console.error('Error fetching settings:', err);

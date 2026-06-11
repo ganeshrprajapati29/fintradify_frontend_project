@@ -1,431 +1,712 @@
-import React, { useState, useEffect } from 'react';
-import { Table, Button, Form, Alert } from 'react-bootstrap';
-import axios from 'axios';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Alert, Badge, Button, Col, Form, Pagination, Row, Spinner, Table } from 'react-bootstrap';
 import moment from 'moment';
+import api from '../utils/axios';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import 'animate.css';
+
+const getRows = (payload) => payload?.data || payload?.attendances || (Array.isArray(payload) ? payload : []);
+
+const getPagination = (payload, fallbackPage, fallbackLimit) => {
+  const pagination = payload?.pagination || {};
+  const total = Number(pagination.total || payload?.total || getRows(payload).length || 0);
+  const limit = Number(pagination.limit || fallbackLimit || 10);
+  return {
+    page: Number(pagination.page || payload?.currentPage || fallbackPage || 1),
+    limit,
+    total,
+    totalPages: Math.max(Number(pagination.totalPages || payload?.totalPages || Math.ceil(total / limit) || 1), 1),
+  };
+};
+
+const formatTime = (value) => value ? moment(value).format('hh:mm A') : '-';
+const formatDate = (value) => value ? moment(value).format('DD MMM YYYY') : '-';
+
+const getLatestTimestamp = (attendance) => {
+  const value = attendance?.date || attendance?.punchIn || attendance?.createdAt || attendance?._id;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
+
+const getHoursWorked = (attendance) => {
+  if (!attendance.punchIn || !attendance.punchOut) return '0.00';
+  const total = new Date(attendance.punchOut) - new Date(attendance.punchIn) - (attendance.totalPausedDuration || 0);
+  return Math.max(total / 36e5, 0).toFixed(2);
+};
+
+const getStatusMeta = (status) => {
+  const normalized = String(status || 'pending').toLowerCase();
+  if (normalized === 'approved') return { label: 'Approved', variant: 'success', className: 'approved' };
+  if (normalized === 'rejected') return { label: 'Rejected', variant: 'danger', className: 'rejected' };
+  return { label: 'Pending', variant: 'warning', className: 'pending' };
+};
 
 const AttendanceTable = ({ isEmployee }) => {
   const [attendances, setAttendances] = useState([]);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [punchStatus, setPunchStatus] = useState({ canPunchIn: true, canPunchOut: false });
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingAttendance, setEditingAttendance] = useState(null);
-  const [editForm, setEditForm] = useState({ punchIn: '', punchOut: '', holiday: false });
+
+  const endpoint = isEmployee ? '/attendance/my-attendance' : '/attendance';
+
+  const filters = useMemo(() => {
+    const params = { page, limit };
+    if (startDate && endDate) {
+      params.startDate = startDate;
+      params.endDate = endDate;
+    }
+    if (statusFilter !== 'all') {
+      params.status = statusFilter;
+    }
+    return params;
+  }, [page, limit, startDate, endDate, statusFilter]);
+
+  const fetchPunchStatus = async () => {
+    if (!isEmployee) return;
+    const today = moment().format('YYYY-MM-DD');
+    const response = await api.get('/attendance/my-attendance', {
+      params: { startDate: today, endDate: today, page: 1, limit: 1 },
+    });
+    const todayAttendance = getRows(response.data)[0];
+    setPunchStatus({
+      canPunchIn: !todayAttendance || !todayAttendance.punchIn,
+      canPunchOut: !!todayAttendance?.punchIn && !todayAttendance?.punchOut,
+    });
+  };
 
   const fetchAttendance = async () => {
+    setLoading(true);
     try {
-      const url = isEmployee
-        ? `${process.env.REACT_APP_API_URL}/attendance/my-attendance`
-        : `${process.env.REACT_APP_API_URL}/attendance`;
-      const res = await axios.get(url, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        params: { startDate, endDate },
-      });
-      setAttendances(res.data || []);
+      const response = await api.get(endpoint, { params: filters });
+      const rows = [...getRows(response.data)].sort((a, b) => getLatestTimestamp(b) - getLatestTimestamp(a));
+      const meta = getPagination(response.data, page, limit);
+      setAttendances(rows);
+      setPage(meta.page);
+      setLimit(meta.limit);
+      setTotal(meta.total);
+      setTotalPages(meta.totalPages);
       setError('');
-
-      if (isEmployee) {
-        const today = new Date().toISOString().split('T')[0];
-        const todayAttendance = res.data.find(
-          (att) => new Date(att.date).toISOString().split('T')[0] === today
-        );
-        setPunchStatus({
-          canPunchIn: !todayAttendance || !todayAttendance.punchIn,
-          canPunchOut: todayAttendance && todayAttendance.punchIn && !todayAttendance.punchOut,
-        });
-      }
+      await fetchPunchStatus();
     } catch (err) {
-      console.error('Fetch attendance error:', err);
       setError(err.response?.data?.message || 'Error fetching attendance');
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchAttendance();
-  }, [startDate, endDate, isEmployee]);
+  }, [filters, endpoint]);
+
+  const summary = useMemo(() => {
+    return attendances.reduce((acc, attendance) => {
+      const status = String(attendance.status || 'pending').toLowerCase();
+      acc.hours += Number(getHoursWorked(attendance));
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    }, { hours: 0, approved: 0, pending: 0, rejected: 0 });
+  }, [attendances]);
+
+  const handleFilter = (event) => {
+    event.preventDefault();
+    if ((startDate && !endDate) || (!startDate && endDate)) {
+      setError('Please select both start and end dates.');
+      return;
+    }
+    setPage(1);
+    setSuccess('');
+  };
+
+  const handleClear = () => {
+    setStartDate('');
+    setEndDate('');
+    setStatusFilter('all');
+    setPage(1);
+    setSuccess('');
+  };
 
   const handlePunch = async (type) => {
     try {
-      const res = await axios.post(
-        `${process.env.REACT_APP_API_URL}/attendance/punch`,
-        { type },
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
+      const response = await api.post('/attendance/punch', { type });
+      setSuccess(response.data.message || `Punch ${type} recorded successfully`);
       setError('');
-      alert(res.data.message);
       fetchAttendance();
     } catch (err) {
-      console.error('Punch error:', err);
+      setSuccess('');
       setError(err.response?.data?.message || 'Error recording punch');
     }
   };
 
   const handleDownload = async () => {
     if (!startDate || !endDate) {
-      setError('Please select both start and end dates');
+      setError('Please select both start and end dates before downloading.');
       return;
     }
     try {
-      const url = isEmployee
-        ? `${process.env.REACT_APP_API_URL}/attendance/download/my-attendance`
-        : `${process.env.REACT_APP_API_URL}/attendance/download`;
-      const res = await axios.get(url, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      const downloadEndpoint = isEmployee ? '/attendance/download/my-attendance' : '/attendance/download';
+      const response = await api.get(downloadEndpoint, {
         params: { startDate, endDate },
         responseType: 'blob',
       });
-      const blob = new Blob([res.data], { type: 'text/csv; charset=utf-8' });
-      const urlBlob = window.URL.createObjectURL(blob);
+      const blob = new Blob([response.data], { type: 'text/csv; charset=utf-8' });
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = urlBlob;
-      link.setAttribute('download', `attendance-${startDate}-${endDate}.csv`);
+      link.href = url;
+      link.setAttribute('download', `${isEmployee ? 'my-' : ''}attendance-${startDate}-${endDate}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      window.URL.revokeObjectURL(urlBlob);
+      window.URL.revokeObjectURL(url);
+      setSuccess('Attendance CSV downloaded successfully');
       setError('');
     } catch (err) {
-      console.error('Download error:', err);
+      setSuccess('');
       setError(err.response?.data?.message || 'Error downloading attendance CSV');
     }
   };
 
+  const renderPagination = () => {
+    const pages = [];
+    const start = Math.max(1, Math.min(page - 2, Math.max(totalPages - 4, 1)));
+    const end = Math.min(totalPages, start + 4);
+
+    for (let item = start; item <= end; item += 1) {
+      pages.push(
+        <Pagination.Item key={item} active={item === page} onClick={() => setPage(item)}>
+          {item}
+        </Pagination.Item>
+      );
+    }
+
+    return (
+      <Pagination className="attendance-pagination">
+        <Pagination.First disabled={page === 1 || loading} onClick={() => setPage(1)} />
+        <Pagination.Prev disabled={page === 1 || loading} onClick={() => setPage(page - 1)} />
+        {start > 1 && <Pagination.Ellipsis disabled />}
+        {pages}
+        {end < totalPages && <Pagination.Ellipsis disabled />}
+        <Pagination.Next disabled={page >= totalPages || loading} onClick={() => setPage(page + 1)} />
+        <Pagination.Last disabled={page >= totalPages || loading} onClick={() => setPage(totalPages)} />
+      </Pagination>
+    );
+  };
+
+  const renderStatus = (status) => {
+    const meta = getStatusMeta(status);
+    return <Badge bg={meta.variant} className="attendance-status-badge">{meta.label}</Badge>;
+  };
+
   return (
-    <div className="attendance-table-container">
+    <div className="attendance-shell">
       <style>
         {`
-          @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
-
-          .attendance-table-container {
-            font-family: 'Poppins', sans-serif;
-            color: #1e40af;
-            background: #ffffff;
-            padding: 1.5rem;
-            border-radius: 1rem;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-            margin: 1rem;
+          .attendance-shell {
+            color: #0f172a;
+            display: grid;
+            gap: 1rem;
+          }
+          .attendance-hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 1rem;
+            align-items: center;
+            padding: 1.15rem;
+            background:
+              radial-gradient(circle at 92% 8%, rgba(14, 165, 233, 0.14), transparent 30%),
+              linear-gradient(135deg, #ffffff 0%, #f8fbff 55%, #eef7ff 100%);
+            border: 1px solid #dbeafe;
+            border-radius: 0.9rem;
+            box-shadow: 0 16px 36px rgba(15, 23, 42, 0.07);
+          }
+          .attendance-eyebrow {
+            margin: 0;
+            color: #64748b;
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
           }
           .attendance-title {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #1e40af;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            margin-bottom: 2rem;
-            text-align: center;
+            margin: 0.25rem 0;
+            color: #0f172a;
+            font-size: clamp(1.45rem, 3vw, 2.1rem);
+            font-weight: 900;
+            line-height: 1.15;
           }
-          .alert {
-            border-radius: 0.6rem;
-            border: 2px solid #f87171;
-            background: #fef2f2;
-            color: #b91c1c;
-            margin-bottom: 1.5rem;
-            padding: 1rem;
-            font-size: 1rem;
-            transition: transform 0.3s ease, opacity 0.3s ease;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-          }
-          .btn-success, .btn-danger, .btn-primary {
-            border-radius: 0.6rem;
-            padding: 0.8rem 2rem;
+          .attendance-subtitle {
+            margin: 0;
+            color: #64748b;
             font-weight: 600;
-            font-size: 1.1rem;
-            position: relative;
-            overflow: hidden;
-            transition: all 0.3s ease;
-            border: 2px solid #3b82f6;
-            background: linear-gradient(90deg, #f0f9ff, #bfdbfe);
-            color: #1e40af;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
           }
-          .btn-success::before, .btn-danger::before, .btn-primary::before {
-            content: '';
-            position: absolute;
-            left: -100%;
-            top: 0;
+          .attendance-punch-card {
+            min-width: 280px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.85rem;
+            padding: 0.85rem;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+          }
+          .attendance-punch-status {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+          }
+          .attendance-punch-status strong {
+            color: #0f172a;
+            font-size: 0.95rem;
+          }
+          .attendance-punch-actions {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.55rem;
+          }
+          .attendance-button {
+            border-radius: 0.65rem;
+            font-weight: 800;
+            min-height: 42px;
+          }
+          .attendance-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.85rem;
+          }
+          .attendance-summary-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.8rem;
+            padding: 0.95rem;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+          }
+          .attendance-summary-card span {
+            display: block;
+            color: #64748b;
+            font-size: 0.76rem;
+            font-weight: 800;
+            text-transform: uppercase;
+          }
+          .attendance-summary-card strong {
+            display: block;
+            margin-top: 0.28rem;
+            color: #0f172a;
+            font-size: 1.5rem;
+            line-height: 1.1;
+          }
+          .attendance-filter-panel,
+          .attendance-table-panel {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.9rem;
+            padding: 1rem;
+            box-shadow: 0 14px 34px rgba(15, 23, 42, 0.07);
+          }
+          .attendance-toolbar {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 1rem;
+            align-items: end;
+          }
+          .attendance-toolbar .form-label {
+            color: #334155;
+            font-weight: 800;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+          }
+          .attendance-toolbar .form-control,
+          .attendance-toolbar .form-select {
+            border-radius: 0.65rem;
+            border: 1px solid #dbe3ef;
+            min-height: 42px;
+            color: #0f172a;
+            font-weight: 600;
+          }
+          .attendance-actions {
+            display: flex;
+            gap: 0.55rem;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+          }
+          .attendance-table-wrap {
+            border: 1px solid #e2e8f0;
+            border-radius: 0.8rem;
+            overflow: hidden;
+          }
+          .attendance-table-wrap table {
+            margin: 0;
+          }
+          .attendance-table-wrap thead th {
+            background: #f8fafc;
+            color: #475569;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 0.74rem;
+            font-weight: 900;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            white-space: nowrap;
+            padding: 0.85rem;
+          }
+          .attendance-table-wrap td {
+            color: #334155;
+            vertical-align: middle;
+            white-space: nowrap;
+            padding: 0.9rem 0.85rem;
+          }
+          .attendance-employee-cell {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            min-width: 220px;
+          }
+          .attendance-avatar {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #2563eb, #14b8a6);
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            overflow: hidden;
+            flex: 0 0 auto;
+          }
+          .attendance-avatar img {
             width: 100%;
             height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.4), transparent);
-            transition: left 0.4s ease;
+            object-fit: cover;
           }
-          .btn-success:hover::before, .btn-danger:hover::before, .btn-primary:hover::before {
-            left: 100%;
+          .attendance-employee-cell strong,
+          .attendance-employee-cell span {
+            display: block;
           }
-          .btn-success:hover {
-            background: linear-gradient(90deg, #047857, #34d399) !important;
-            border-color: #34d399 !important;
-            color: #fff !important;
-            transform: scale(1.05);
-            box-shadow: 0 6px 16px rgba(52, 211, 153, 0.5);
+          .attendance-employee-cell strong {
+            color: #0f172a;
+            font-weight: 850;
           }
-          .btn-danger:hover {
-            background: linear-gradient(90deg, #b91c1c, #f87171) !important;
-            border-color: #f87171 !important;
-            color: #fff !important;
-            transform: scale(1.05);
-            box-shadow: 0 6px 16px rgba(248, 113, 113, 0.5);
+          .attendance-employee-cell span {
+            color: #64748b;
+            font-size: 0.82rem;
+            margin-top: 0.1rem;
           }
-          .btn-primary:hover {
-            background: linear-gradient(90deg, #1e40af, #3b82f6) !important;
-            border-color: #3b82f6 !important;
-            color: #fff !important;
-            transform: scale(1.05);
-            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5);
-          }
-          .btn-success:disabled, .btn-danger:disabled {
-            border-color: #d1d5db;
-            color: #6b7280;
-            background: #f3f4f6;
-            opacity: 0.6;
-            transform: none;
-            box-shadow: none;
-          }
-          .btn-success svg, .btn-danger svg, .btn-primary svg {
-            width: 24px;
-            height: 24px;
-            margin-right: 0.75rem;
-            vertical-align: middle;
-          }
-          .form-group {
-            margin-bottom: 1.5rem;
-          }
-          .form-label {
-            font-size: 1rem;
-            font-weight: 600;
-            color: #1e40af;
-            margin-bottom: 0.5rem;
-          }
-          .form-control {
-            background: #f8fafc;
-            border: 2px solid #bfdbfe;
-            color: #1e40af;
-            border-radius: 0.6rem;
-            padding: 0.8rem;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-          }
-          .form-control:focus {
-            border-color: #3b82f6;
-            box-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
+          .attendance-table-wrap tbody tr:hover {
             background: #f8fafc;
           }
-          .form-control:hover {
-            border-color: #3b82f6;
+          .attendance-status-badge {
+            border-radius: 999px;
+            padding: 0.42rem 0.62rem;
+            text-transform: capitalize;
           }
-          .table {
-            border-radius: 0.6rem;
+          .attendance-location {
+            max-width: 260px;
             overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          .attendance-mobile-list {
+            display: none;
+            gap: 0.75rem;
+          }
+          .attendance-mobile-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 0.8rem;
+            background: #ffffff;
+            padding: 0.9rem;
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
+          }
+          .attendance-mobile-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+          }
+          .attendance-mobile-date {
+            color: #0f172a;
+            font-weight: 900;
+          }
+          .attendance-mobile-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.55rem;
+          }
+          .attendance-mobile-field {
             background: #f8fafc;
-            color: #1e40af;
-            border: 2px solid rgba(30, 64, 175, 0.2);
-            margin-top: 1.5rem;
-            font-size: 1rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.65rem;
+            padding: 0.65rem;
           }
-          .table thead {
-            background: linear-gradient(to right, #1e40af, #3b82f6);
-            color: #fff;
-            font-weight: 600;
+          .attendance-mobile-field span {
+            display: block;
+            color: #64748b;
+            font-size: 0.72rem;
+            font-weight: 800;
             text-transform: uppercase;
+          }
+          .attendance-mobile-field strong {
+            display: block;
+            color: #0f172a;
+            margin-top: 0.2rem;
             font-size: 0.9rem;
-            letter-spacing: 0.5px;
           }
-          .table th, .table td {
-            padding: 1.2rem;
-            vertical-align: middle;
-            border-color: rgba(30, 64, 175, 0.2);
-          }
-          .table tbody tr:nth-child(even) {
-            background: rgba(191, 219, 254, 0.1);
-          }
-          .table tbody tr:hover {
-            background: rgba(59, 130, 246, 0.15);
-            transform: scale(1.01);
-          }
-          .table-empty {
+          .attendance-empty {
             text-align: center;
-            font-style: italic;
-            color: #374151;
-            padding: 1.5rem;
-            font-size: 1rem;
+            color: #64748b;
+            padding: 2rem !important;
+            font-weight: 700;
           }
-          @media (max-width: 576px) {
-            .attendance-table-container {
-              padding: 1rem;
-              margin: 0.5rem;
+          .attendance-pagination-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+          }
+          .attendance-pagination {
+            margin: 0;
+          }
+          .attendance-pagination .page-link {
+            color: #1d4ed8;
+            border-color: #dbe3ef;
+            font-weight: 800;
+          }
+          .attendance-pagination .active .page-link {
+            background: #1d4ed8;
+            border-color: #1d4ed8;
+          }
+          @media (max-width: 992px) {
+            .attendance-hero,
+            .attendance-toolbar {
+              grid-template-columns: 1fr;
             }
-            .attendance-title {
-              font-size: 1.6rem;
-              margin-bottom: 1.5rem;
+            .attendance-punch-card {
+              min-width: 0;
             }
-            .alert {
-              font-size: 0.9rem;
-              padding: 0.8rem;
+            .attendance-actions {
+              justify-content: flex-start;
             }
-            .btn-success, .btn-danger, .btn-primary {
-              padding: 0.6rem 1.5rem;
-              font-size: 0.95rem;
-            }
-            .btn-success svg, .btn-danger svg, .btn-primary svg {
-              width: 20px;
-              height: 20px;
-            }
-            .form-control {
-              font-size: 0.9rem;
-              padding: 0.7rem;
-            }
-            .form-label {
-              font-size: 0.9rem;
-            }
-            .table th, .table td {
-              padding: 0.8rem;
-              font-size: 0.85rem;
-            }
-            .table-responsive {
-              margin: 0 0.5rem;
-            }
-            .table-empty {
-              font-size: 0.9rem;
+            .attendance-summary-grid {
+              grid-template-columns: repeat(2, minmax(0, 1fr));
             }
           }
-          @media (max-width: 400px) {
-            .attendance-title {
-              font-size: 1.4rem;
+          @media (max-width: 720px) {
+            .attendance-table-wrap {
+              display: none;
             }
-            .btn-success, .btn-danger, .btn-primary {
-              padding: 0.5rem 1.2rem;
-              font-size: 0.9rem;
+            .attendance-mobile-list {
+              display: grid;
             }
-            .btn-success svg, .btn-danger svg, .btn-primary svg {
-              width: 18px;
-              height: 18px;
+          }
+          @media (max-width: 560px) {
+            .attendance-filter-panel,
+            .attendance-table-panel,
+            .attendance-hero {
+              padding: 0.85rem;
             }
-            .form-control {
-              font-size: 0.8rem;
-              padding: 0.6rem;
+            .attendance-summary-grid,
+            .attendance-punch-actions,
+            .attendance-mobile-grid {
+              grid-template-columns: 1fr;
             }
-            .form-label {
-              font-size: 0.85rem;
+            .attendance-actions .btn {
+              width: 100%;
             }
-            .table th, .table td {
-              padding: 0.6rem;
-              font-size: 0.8rem;
+            .attendance-pagination-wrap {
+              align-items: stretch;
+              flex-direction: column;
             }
-            .table-empty {
-              font-size: 0.85rem;
+            .attendance-pagination {
+              flex-wrap: wrap;
             }
           }
         `}
       </style>
-      <div className="attendance-table-container animate__animated animate__fadeIn">
-        <h3 className="attendance-title">Attendance Details</h3>
-        {error && (
-          <Alert variant="danger" className="animate__animated animate__fadeIn">
-            {error}
-          </Alert>
-        )}
+
+      <section className="attendance-hero">
+        <div>
+          <p className="attendance-eyebrow">{isEmployee ? 'Employee attendance' : 'Attendance management'}</p>
+          <h2 className="attendance-title">{isEmployee ? 'My Attendance' : 'All Attendance Records'}</h2>
+          <p className="attendance-subtitle">
+            {total.toLocaleString('en-IN')} records found. Use date filters for precise reports and CSV export.
+          </p>
+        </div>
         {isEmployee && (
-          <div className="mb-3">
-            <Button
-              variant="success"
-              onClick={() => handlePunch('in')}
-              className="me-2 animate__animated animate__fadeIn"
-              style={{ animationDelay: '0.1s' }}
-              disabled={!punchStatus.canPunchIn}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              {punchStatus.canPunchIn ? 'Punch In' : 'Punched In Today'}
-            </Button>
-            <Button
-              variant="danger"
-              onClick={() => handlePunch('out')}
-              className="animate__animated animate__fadeIn"
-              style={{ animationDelay: '0.2s' }}
-              disabled={!punchStatus.canPunchOut}
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              {punchStatus.canPunchOut ? 'Punch Out' : punchStatus.canPunchIn ? 'Punch In First' : 'Punched Out Today'}
-            </Button>
+          <div className="attendance-punch-card">
+            <div className="attendance-punch-status">
+              <div>
+                <p className="attendance-eyebrow">Today status</p>
+                <strong>{punchStatus.canPunchIn ? 'Ready to punch in' : punchStatus.canPunchOut ? 'Working session active' : 'Punch completed'}</strong>
+              </div>
+              <Badge bg={punchStatus.canPunchOut ? 'success' : punchStatus.canPunchIn ? 'primary' : 'secondary'}>
+                {moment().format('DD MMM')}
+              </Badge>
+            </div>
+            <div className="attendance-punch-actions">
+              <Button className="attendance-button" variant="success" onClick={() => handlePunch('in')} disabled={!punchStatus.canPunchIn || loading}>
+                Punch In
+              </Button>
+              <Button className="attendance-button" variant="danger" onClick={() => handlePunch('out')} disabled={!punchStatus.canPunchOut || loading}>
+                Punch Out
+              </Button>
+            </div>
           </div>
         )}
-        <Form className="mb-3">
-          <Form.Group controlId="startDate" className="animate__animated animate__fadeIn" style={{ animationDelay: '0.3s' }}>
-            <Form.Label>Start Date</Form.Label>
-            <Form.Control
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              required
-            />
-          </Form.Group>
-          <Form.Group controlId="endDate" className="mt-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.4s' }}>
-            <Form.Label>End Date</Form.Label>
-            <Form.Control
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              required
-            />
-          </Form.Group>
-          <Button
-            variant="primary"
-            onClick={handleDownload}
-            className="mt-3 animate__animated animate__fadeIn"
-            style={{ animationDelay: '0.5s' }}
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Download CSV
-          </Button>
+      </section>
+
+      {error && <Alert variant="danger">{error}</Alert>}
+      {success && <Alert variant="success">{success}</Alert>}
+
+      <section className="attendance-summary-grid">
+        <div className="attendance-summary-card"><span>Page Records</span><strong>{attendances.length}</strong></div>
+        <div className="attendance-summary-card"><span>Approved</span><strong>{summary.approved || 0}</strong></div>
+        <div className="attendance-summary-card"><span>Pending</span><strong>{summary.pending || 0}</strong></div>
+        <div className="attendance-summary-card"><span>Total Hours</span><strong>{summary.hours.toFixed(1)}</strong></div>
+      </section>
+
+      <section className="attendance-filter-panel">
+        <Form onSubmit={handleFilter} className="attendance-toolbar">
+          <Row className="g-3">
+            <Col md={3}>
+              <Form.Group>
+                <Form.Label>Start Date</Form.Label>
+                <Form.Control type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+              </Form.Group>
+            </Col>
+            <Col md={3}>
+              <Form.Group>
+                <Form.Label>End Date</Form.Label>
+                <Form.Control type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+              </Form.Group>
+            </Col>
+            <Col md={3}>
+              <Form.Group>
+                <Form.Label>Rows Per Page</Form.Label>
+                <Form.Select value={limit} onChange={(event) => { setLimit(Number(event.target.value)); setPage(1); }}>
+                  {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size}</option>)}
+                </Form.Select>
+              </Form.Group>
+            </Col>
+            <Col md={3}>
+              <Form.Group>
+                <Form.Label>Status</Form.Label>
+                <Form.Select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }}>
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                </Form.Select>
+              </Form.Group>
+            </Col>
+          </Row>
+          <div className="attendance-actions">
+            <Button type="submit" className="attendance-button" variant="primary">Apply</Button>
+            <Button type="button" className="attendance-button" variant="outline-secondary" onClick={handleClear}>Clear</Button>
+            <Button type="button" className="attendance-button" variant="outline-primary" onClick={handleDownload}>Download CSV</Button>
+          </div>
         </Form>
-        <div className="table-responsive">
-          <Table className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.6s' }}>
+      </section>
+
+      <section className="attendance-table-panel">
+        <div className="attendance-table-wrap table-responsive">
+          <Table hover>
             <thead>
               <tr>
-                <th>Employee ID</th>
-                <th>Name</th>
+                {!isEmployee && <th>Employee ID</th>}
+                {!isEmployee && <th>Employee</th>}
                 <th>Date</th>
                 <th>Punch In</th>
                 <th>Punch Out</th>
-                <th>Hours Worked</th>
-                <th>Hourly Rate (₹)</th>
-                <th>Total Salary (₹)</th>
+                <th>Hours</th>
+                <th>Status</th>
+                <th>Location</th>
               </tr>
             </thead>
             <tbody>
-              {attendances.length > 0 ? (
-                attendances.map((att, index) => {
-                  const hoursWorked = att.punchOut && att.punchIn
-                    ? ((new Date(att.punchOut) - new Date(att.punchIn)) / 1000 / 60 / 60).toFixed(2)
-                    : '0.00';
-                  return (
-                    <tr key={att._id} className="animate__animated animate__fadeIn" style={{ animationDelay: `${0.05 * index}s` }}>
-                      <td>{att.employee?.employeeId || 'N/A'}</td>
-                      <td>{att.employee?.name || 'N/A'}</td>
-                      <td>{moment(att.date).format('YYYY-MM-DD')}</td>
-                      <td>{att.punchIn ? moment(att.punchIn).format('HH:mm:ss') : '-'}</td>
-                      <td>{att.punchOut ? moment(att.punchOut).format('HH:mm:ss') : '-'}</td>
-                      <td>{hoursWorked}</td>
-                      <td>{att.employee?.hourlyRate || 'N/A'}</td>
-                      <td>{att.employee?.hourlyRate && hoursWorked !== '0.00' ? (att.employee.hourlyRate * hoursWorked).toFixed(2) : 'N/A'}</td>
-                    </tr>
-                  );
-                })
+              {loading ? (
+                <tr>
+                  <td className="attendance-empty" colSpan={isEmployee ? 6 : 8}>
+                    <Spinner animation="border" size="sm" className="me-2" /> Loading attendance...
+                  </td>
+                </tr>
+              ) : attendances.length > 0 ? (
+                attendances.map((attendance) => (
+                  <tr key={attendance._id}>
+                    {!isEmployee && <td>{attendance.employee?.employeeId || 'N/A'}</td>}
+                    {!isEmployee && (
+                      <td>
+                        <div className="attendance-employee-cell">
+                          <div className="attendance-avatar">
+                            {attendance.employee?.profilePhoto ? (
+                              <img src={attendance.employee.profilePhoto} alt={attendance.employee?.name || 'Employee'} />
+                            ) : (
+                              (attendance.employee?.name || 'E')[0].toUpperCase()
+                            )}
+                          </div>
+                          <div>
+                            <strong>{attendance.employee?.name || 'N/A'}</strong>
+                            <span>{attendance.employee?.position || attendance.employee?.department || 'Team member'}</span>
+                          </div>
+                        </div>
+                      </td>
+                    )}
+                    <td>{formatDate(attendance.date)}</td>
+                    <td>{formatTime(attendance.punchIn)}</td>
+                    <td>{formatTime(attendance.punchOut)}</td>
+                    <td>{getHoursWorked(attendance)}</td>
+                    <td>{renderStatus(attendance.status)}</td>
+                    <td className="attendance-location" title={attendance.locationAddress || ''}>{attendance.locationAddress || '-'}</td>
+                  </tr>
+                ))
               ) : (
                 <tr>
-                  <td colSpan="8" className="table-empty">No attendance records available</td>
+                  <td className="attendance-empty" colSpan={isEmployee ? 6 : 8}>No attendance records found</td>
                 </tr>
               )}
             </tbody>
           </Table>
         </div>
-      </div>
+
+        <div className="attendance-mobile-list">
+          {loading ? (
+            <div className="attendance-empty">
+              <Spinner animation="border" size="sm" className="me-2" /> Loading attendance...
+            </div>
+          ) : attendances.length > 0 ? (
+            attendances.map((attendance) => (
+              <article className="attendance-mobile-card" key={attendance._id}>
+                <div className="attendance-mobile-head">
+                  <div>
+                    <div className="attendance-mobile-date">{formatDate(attendance.date)}</div>
+                    {!isEmployee && <div className="text-muted small">{attendance.employee?.name || 'N/A'} ({attendance.employee?.employeeId || 'N/A'})</div>}
+                  </div>
+                  {renderStatus(attendance.status)}
+                </div>
+                <div className="attendance-mobile-grid">
+                  <div className="attendance-mobile-field"><span>Punch In</span><strong>{formatTime(attendance.punchIn)}</strong></div>
+                  <div className="attendance-mobile-field"><span>Punch Out</span><strong>{formatTime(attendance.punchOut)}</strong></div>
+                  <div className="attendance-mobile-field"><span>Hours</span><strong>{getHoursWorked(attendance)}</strong></div>
+                  <div className="attendance-mobile-field"><span>Location</span><strong>{attendance.locationAddress || '-'}</strong></div>
+                </div>
+              </article>
+            ))
+          ) : (
+            <div className="attendance-empty">No attendance records found</div>
+          )}
+        </div>
+
+        <div className="attendance-pagination-wrap">
+          <span className="text-muted">
+            Page {page} of {totalPages} | Showing {total ? ((page - 1) * limit) + 1 : 0}-{Math.min(page * limit, total)} of {total.toLocaleString('en-IN')}
+          </span>
+          {renderPagination()}
+        </div>
+      </section>
     </div>
   );
 };

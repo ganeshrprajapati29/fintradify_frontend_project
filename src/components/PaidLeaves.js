@@ -1,9 +1,33 @@
-import React, { useState, useEffect } from 'react';
-import { Form, Button, Table, Alert } from 'react-bootstrap';
-import axios from 'axios';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Alert, Badge, Button, Col, Form, Row, Spinner, Table } from 'react-bootstrap';
 import moment from 'moment';
+import api from '../utils/axios';
+import PaginationControls from './PaginationControls';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import 'animate.css';
+
+const getArrayPayload = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  return [];
+};
+
+const getStatusMeta = (status) => {
+  const normalized = String(status || 'pending').toLowerCase();
+  if (normalized === 'approved') return { label: 'Approved', variant: 'success' };
+  if (normalized === 'rejected') return { label: 'Rejected', variant: 'danger' };
+  return { label: 'Pending', variant: 'warning' };
+};
+
+const getLeaveDays = (startDate, endDate) => {
+  if (!startDate || !endDate) return 0;
+  const start = moment(startDate);
+  const end = moment(endDate);
+  if (!start.isValid() || !end.isValid() || end.isBefore(start)) return 0;
+  return end.diff(start, 'days') + 1;
+};
+
+const getEmployeeName = (leave) => leave.employee?.name || leave.name || 'N/A';
+const getEmployeeCode = (leave) => leave.employee?.employeeId || leave.employeeId || 'N/A';
 
 const PaidLeaves = ({ isAdmin }) => {
   const [leaves, setLeaves] = useState([]);
@@ -12,514 +36,552 @@ const PaidLeaves = ({ isAdmin }) => {
   const [leaveBalances, setLeaveBalances] = useState({ paidLeaveBalance: 0, halfDayLeaveBalance: 0 });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+
+  const requestedDays = getLeaveDays(formData.startDate, formData.endDate);
 
   const fetchLeaveData = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setError('Please login to view leave data');
-      return;
-    }
-    try {
-      const url = isAdmin
-        ? `${process.env.REACT_APP_API_URL}/leaves/employee-data`
-        : `${process.env.REACT_APP_API_URL}/leaves/my-employee-data`;
-      const res = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (isAdmin) {
-        setLeaveData(res.data);
-      } else {
-        setLeaveData([res.data]); // For employee, wrap in array for consistency
-      }
-      setError('');
-      setSuccess('');
-    } catch (err) {
-      console.error('Error fetching leave data:', err);
-      setError(err.response?.data?.message || 'Error fetching leave data');
-    }
+    const url = isAdmin ? '/leaves/employee-data' : '/leaves/my-employee-data';
+    const res = await api.get(url);
+    setLeaveData(isAdmin ? getArrayPayload(res.data) : [res.data].filter(Boolean));
   };
 
   const fetchLeaves = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) return; // Skip if no token
-    try {
-      const url = isAdmin
-        ? `${process.env.REACT_APP_API_URL}/leaves`
-        : `${process.env.REACT_APP_API_URL}/leaves/my-leaves`;
-      const res = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      // Filter for paid leaves
-      const paidLeaves = res.data ? res.data.filter(leave => leave.type === 'paid') : [];
-      setLeaves(paidLeaves);
-      setError('');
-      setSuccess('');
-    } catch (err) {
-      console.error('Error fetching paid leaves:', err);
-      setError(err.response?.data?.message || 'Error fetching paid leave requests');
-    }
+    const url = isAdmin ? '/leaves' : '/leaves/my-leaves';
+    const res = await api.get(url);
+    const paidLeaves = getArrayPayload(res.data)
+      .filter((leave) => String(leave.type || 'paid').toLowerCase() === 'paid')
+      .sort((a, b) => new Date(b.appliedAt || b.createdAt || b.startDate || 0) - new Date(a.appliedAt || a.createdAt || a.startDate || 0));
+    setLeaves(paidLeaves);
   };
 
   const fetchLeaveBalances = async () => {
-    if (isAdmin) return; // Only fetch for employees
-    const token = localStorage.getItem('token');
-    if (!token) return; // Skip if no token
+    if (isAdmin) return;
+    const res = await api.get('/leaves/my-balances');
+    setLeaveBalances(res.data || { paidLeaveBalance: 0, halfDayLeaveBalance: 0 });
+  };
+
+  const refreshData = async () => {
+    setLoading(true);
     try {
-      const res = await axios.get(`${process.env.REACT_APP_API_URL}/leaves/my-balances`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setLeaveBalances(res.data || { paidLeaveBalance: 0, halfDayLeaveBalance: 0 });
+      await Promise.all([fetchLeaveData(), fetchLeaves(), fetchLeaveBalances()]);
+      setError('');
     } catch (err) {
-      console.error('Error fetching leave balances:', err);
-      // Don't set error for balances, as it's not critical
+      setError(err.response?.data?.message || 'Error fetching paid leave data');
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchLeaveData();
-    fetchLeaves();
-    fetchLeaveBalances();
+    refreshData();
   }, [isAdmin]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const summary = useMemo(() => {
+    return leaves.reduce((acc, leave) => {
+      const status = String(leave.status || 'pending').toLowerCase();
+      acc[status] = (acc[status] || 0) + 1;
+      acc.days += getLeaveDays(leave.startDate, leave.endDate);
+      return acc;
+    }, { pending: 0, approved: 0, rejected: 0, days: 0 });
+  }, [leaves]);
+
+  const employeeSummary = useMemo(() => {
+    return leaveData.reduce((acc, employee) => {
+      if (employee.isEligible) acc.eligible += 1;
+      acc.remaining += Number(employee.remainingLeaves || 0);
+      acc.used += Number(employee.usedPaidLeaves || 0);
+      return acc;
+    }, { eligible: 0, remaining: 0, used: 0 });
+  }, [leaveData]);
+
+  const filteredLeaves = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return leaves.filter((leave) => {
+      const status = String(leave.status || 'pending').toLowerCase();
+      const text = `${getEmployeeName(leave)} ${getEmployeeCode(leave)} ${leave.reason || ''}`.toLowerCase();
+      return (statusFilter === 'all' || status === statusFilter) && (!query || text.includes(query));
+    });
+  }, [leaves, search, statusFilter]);
+
+  const paginatedLeaves = filteredLeaves.slice((page - 1) * limit, page * limit);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, limit]);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     if (isAdmin) {
       setError('Admins cannot request paid leaves');
       return;
     }
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setError('Please login to request leave');
+
+    if (!requestedDays) {
+      setError('Please select a valid date range.');
       return;
     }
+
+    if (requestedDays > Number(leaveBalances.paidLeaveBalance || 0)) {
+      setError(`Insufficient paid leave balance. Available: ${leaveBalances.paidLeaveBalance}, requested: ${requestedDays}.`);
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      await axios.post(`${process.env.REACT_APP_API_URL}/leaves`, {
-        ...formData,
-        type: 'paid'
-      }, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.post('/leaves', { ...formData, type: 'paid' });
       setSuccess('Paid leave requested successfully');
-      setFormData({ startDate: '', endDate: '', reason: '' });
-      fetchLeaves();
       setError('');
+      setFormData({ startDate: '', endDate: '', reason: '' });
+      await refreshData();
     } catch (err) {
-      console.error('Request paid leave error:', err);
+      setSuccess('');
       setError(err.response?.data?.message || 'Error requesting paid leave');
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleStatus = async (id, status) => {
     try {
-      await axios.put(
-        `${process.env.REACT_APP_API_URL}/leaves/${id}`,
-        { status },
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
+      await api.put(`/leaves/${id}`, { status });
       setSuccess(`Paid leave ${status} successfully`);
-      fetchLeaves();
       setError('');
+      await refreshData();
     } catch (err) {
-      console.error('Update paid leave status error:', err);
+      setSuccess('');
       setError(err.response?.data?.message || `Error ${status === 'approved' ? 'approving' : 'rejecting'} paid leave`);
     }
   };
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = (event) => {
+    setFormData({ ...formData, [event.target.name]: event.target.value });
   };
 
   return (
-    <div className="paid-leaves-dashboard">
+    <div className="paid-page">
       <style>
         {`
-          @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
-
-          .paid-leaves-dashboard {
-            font-family: 'Poppins', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 2rem;
-            color: #fff;
-          }
-
-          .dashboard-header {
-            text-align: center;
-            margin-bottom: 3rem;
-          }
-
-          .dashboard-title {
-            font-size: 3rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-            text-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-            background: linear-gradient(45deg, #fff, #e0e7ff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-          }
-
-          .dashboard-subtitle {
-            font-size: 1.2rem;
-            opacity: 0.9;
-            margin-bottom: 2rem;
-          }
-
-          .employee-cards-grid {
+          .paid-page {
+            color: #0f172a;
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: 2rem;
-            margin-bottom: 3rem;
-          }
-
-          .employee-card {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            padding: 2rem;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            transition: all 0.3s ease;
-            color: #1e40af;
-          }
-
-          .employee-card:hover {
-            transform: translateY(-10px);
-            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.2);
-          }
-
-          .employee-header {
-            display: flex;
-            align-items: center;
-            margin-bottom: 1.5rem;
-            padding-bottom: 1rem;
-            border-bottom: 2px solid #e0e7ff;
-          }
-
-          .employee-avatar {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 700;
-            font-size: 1.5rem;
-            margin-right: 1rem;
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-          }
-
-          .employee-info h3 {
-            margin: 0;
-            font-size: 1.4rem;
-            font-weight: 600;
-            color: #1e40af;
-          }
-
-          .employee-id {
-            color: #6b7280;
-            font-size: 0.9rem;
-            margin: 0.2rem 0 0 0;
-          }
-
-          .eligibility-badge {
-            display: inline-block;
-            padding: 0.5rem 1rem;
-            border-radius: 25px;
-            font-weight: 600;
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 1.5rem;
-          }
-
-          .eligible {
-            background: linear-gradient(135deg, #10b981, #059669);
-            color: white;
-          }
-
-          .not-eligible {
-            background: linear-gradient(135deg, #f59e0b, #d97706);
-            color: white;
-          }
-
-          .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
             gap: 1rem;
-            margin-bottom: 1.5rem;
           }
-
-          .info-item {
-            background: #f8fafc;
-            padding: 1rem;
-            border-radius: 12px;
-            text-align: center;
-            border: 1px solid #e0e7ff;
+          .paid-hero,
+          .paid-panel,
+          .paid-stat,
+          .paid-employee-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.85rem;
+            box-shadow: 0 14px 34px rgba(15, 23, 42, 0.07);
           }
-
-          .info-label {
-            font-size: 0.8rem;
-            color: #6b7280;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
+          .paid-hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 1rem;
+            padding: 1.15rem;
+            background: linear-gradient(135deg, #ffffff, #f8fbff);
+            border-color: #dbeafe;
           }
-
-          .info-value {
-            font-size: 1.2rem;
-            font-weight: 700;
-            color: #1e40af;
-          }
-
-          .eligibility-info {
-            background: #f0f9ff;
-            padding: 1rem;
-            border-radius: 12px;
-            border-left: 4px solid #3b82f6;
-            margin-top: 1rem;
-          }
-
-          .eligibility-text {
+          .paid-eyebrow {
             margin: 0;
-            font-size: 0.9rem;
-            color: #1e40af;
-            font-weight: 500;
+            color: #64748b;
+            font-size: 0.76rem;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
           }
-
-          .leave-request-section {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            padding: 2rem;
-            margin-top: 3rem;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+          .paid-title {
+            margin: 0.25rem 0;
+            color: #0f172a;
+            font-size: clamp(1.45rem, 3vw, 2.1rem);
+            font-weight: 900;
+            line-height: 1.15;
           }
-
-          .section-title {
-            font-size: 1.8rem;
+          .paid-subtitle {
+            margin: 0;
+            color: #64748b;
             font-weight: 600;
-            color: #1e40af;
-            margin-bottom: 2rem;
-            text-align: center;
           }
-
-          .form-group {
-            margin-bottom: 1.5rem;
+          .paid-request-card {
+            min-width: 210px;
+            padding: 0.9rem;
+            border-radius: 0.75rem;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
           }
-
-          .form-label {
-            font-size: 1rem;
+          .paid-request-card strong {
+            display: block;
+            color: #0f172a;
+            font-size: 1.75rem;
+            line-height: 1;
+          }
+          .paid-stat-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 0.85rem;
+          }
+          .paid-stat {
+            padding: 0.95rem;
+          }
+          .paid-stat span {
+            display: block;
+            color: #64748b;
+            font-size: 0.75rem;
+            font-weight: 900;
+            text-transform: uppercase;
+          }
+          .paid-stat strong {
+            display: block;
+            margin-top: 0.28rem;
+            color: #0f172a;
+            font-size: 1.5rem;
+          }
+          .paid-grid {
+            display: grid;
+            grid-template-columns: minmax(300px, 0.86fr) minmax(0, 1.14fr);
+            gap: 1rem;
+            align-items: start;
+          }
+          .paid-panel {
+            padding: 1rem;
+          }
+          .paid-panel-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1rem;
+          }
+          .paid-panel-title {
+            margin: 0;
+            color: #0f172a;
+            font-size: 1.05rem;
+            font-weight: 900;
+          }
+          .paid-controls {
+            display: grid;
+            grid-template-columns: minmax(180px, 1fr) 160px;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+          }
+          .paid-page .form-label {
+            color: #334155;
+            font-size: 0.76rem;
+            font-weight: 900;
+            text-transform: uppercase;
+          }
+          .paid-page .form-control,
+          .paid-page .form-select {
+            border: 1px solid #dbe3ef;
+            border-radius: 0.65rem;
+            color: #0f172a;
             font-weight: 600;
-            color: #1e40af;
-            margin-bottom: 0.5rem;
+          }
+          .paid-page .form-control:focus,
+          .paid-page .form-select:focus {
+            border-color: #93c5fd;
+            box-shadow: 0 0 0 0.2rem rgba(37, 99, 235, 0.1);
+          }
+          .paid-table-wrap {
+            border: 1px solid #e2e8f0;
+            border-radius: 0.8rem;
+            overflow: hidden;
+          }
+          .paid-table-wrap table {
+            margin: 0;
+          }
+          .paid-table-wrap thead th {
+            background: #f8fafc;
+            color: #475569;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 0.74rem;
+            font-weight: 900;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            white-space: nowrap;
+            padding: 0.85rem;
+          }
+          .paid-table-wrap td {
+            color: #334155;
+            vertical-align: middle;
+            padding: 0.9rem 0.85rem;
+          }
+          .paid-employee-list {
+            display: grid;
+            gap: 0.75rem;
+            max-height: 560px;
+            overflow: auto;
+            padding-right: 0.25rem;
+          }
+          .paid-employee-card {
+            box-shadow: none;
+            padding: 0.85rem;
+          }
+          .paid-person {
             display: flex;
             align-items: center;
             gap: 0.75rem;
           }
-
-          .form-label svg {
-            width: 24px;
-            height: 24px;
+          .paid-avatar {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            flex: 0 0 auto;
+            color: #1d4ed8;
+            background: #dbeafe;
+            font-weight: 900;
           }
-
-          .form-control {
-            background: #f8fafc;
-            border: 2px solid #bfdbfe;
-            color: #1e40af;
-            border-radius: 0.6rem;
-            padding: 0.8rem;
-            font-size: 1rem;
-            transition: all 0.3s ease;
+          .paid-person strong {
+            display: block;
+            color: #0f172a;
           }
-
-          .form-control:focus {
-            border-color: #3b82f6;
-            box-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
-            background: #f8fafc;
-          }
-
-          .btn-primary {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border: none;
-            border-radius: 0.6rem;
-            padding: 0.8rem 2rem;
+          .paid-person span,
+          .paid-meta {
+            color: #64748b;
+            font-size: 0.85rem;
             font-weight: 600;
-            font-size: 1.1rem;
-            color: white;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
           }
-
-          .btn-primary:hover {
-            transform: scale(1.05);
-            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+          .paid-mini-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.65rem;
+            margin-top: 0.85rem;
           }
-
-          .alert {
-            border-radius: 0.6rem;
-            margin-bottom: 1.5rem;
+          .paid-mini {
+            border: 1px solid #e2e8f0;
+            border-radius: 0.65rem;
+            background: #f8fafc;
+            padding: 0.65rem;
+          }
+          .paid-mini span {
+            display: block;
+            color: #64748b;
+            font-size: 0.72rem;
+            font-weight: 900;
+            text-transform: uppercase;
+          }
+          .paid-mini strong {
+            color: #0f172a;
+          }
+          .paid-empty {
+            min-height: 220px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            border: 1px dashed #cbd5e1;
+            border-radius: 0.8rem;
+            background: #f8fafc;
+            font-weight: 700;
+            text-align: center;
             padding: 1rem;
-            font-size: 1rem;
           }
-
-          @media (max-width: 768px) {
-            .paid-leaves-dashboard {
-              padding: 1rem;
-            }
-
-            .dashboard-title {
-              font-size: 2rem;
-            }
-
-            .employee-cards-grid {
+          @media (max-width: 1150px) {
+            .paid-grid,
+            .paid-hero {
               grid-template-columns: 1fr;
-              gap: 1.5rem;
             }
-
-            .employee-card {
-              padding: 1.5rem;
+            .paid-stat-grid {
+              grid-template-columns: repeat(3, minmax(0, 1fr));
             }
-
-            .info-grid {
+          }
+          @media (max-width: 760px) {
+            .paid-stat-grid,
+            .paid-mini-grid,
+            .paid-controls {
               grid-template-columns: 1fr;
+            }
+            .paid-panel-head {
+              align-items: flex-start;
+              flex-direction: column;
+            }
+          }
+          @media (max-width: 560px) {
+            .paid-panel,
+            .paid-hero {
+              padding: 0.85rem;
+            }
+            .paid-table-wrap {
+              overflow-x: auto;
             }
           }
         `}
       </style>
 
-      <div className="dashboard-header">
-        <h1 className="dashboard-title">Paid Leaves Dashboard</h1>
-        <p className="dashboard-subtitle">Track employee eligibility and leave balances</p>
-      </div>
-
-      {error && (
-        <Alert variant="danger" className="mb-4">
-          {error}
-        </Alert>
-      )}
-
-      {success && (
-        <Alert variant="success" className="mb-4">
-          {success}
-        </Alert>
-      )}
-
-      <div className="employee-cards-grid">
-        {leaveData.map((employee, index) => (
-          <div key={employee.employeeId} className="employee-card animate__animated animate__fadeInUp" style={{ animationDelay: `${index * 0.1}s` }}>
-            <div className="employee-header">
-              <div className="employee-avatar">
-                {employee.name.charAt(0).toUpperCase()}
-              </div>
-              <div className="employee-info">
-                <h3>{employee.name}</h3>
-                <p className="employee-id">ID: {employee.employeeId}</p>
-              </div>
-            </div>
-
-            <div className={`eligibility-badge ${employee.isEligible ? 'eligible' : 'not-eligible'}`}>
-              {employee.isEligible ? 'Eligible for Paid Leave' : 'Not Eligible Yet'}
-            </div>
-
-            <div className="info-grid">
-              <div className="info-item">
-                <div className="info-label">Remaining Leaves</div>
-                <div className="info-value">{employee.remainingLeaves}</div>
-              </div>
-              <div className="info-item">
-                <div className="info-label">Taken Leaves</div>
-                <div className="info-value">{employee.usedPaidLeaves || 0}</div>
-              </div>
-            </div>
-            <div className="info-grid">
-              <div className="info-item">
-                <div className="info-label">Joining Date</div>
-                <div className="info-value">{moment(employee.joiningDate).format('MMM DD, YYYY')}</div>
-              </div>
-              <div className="info-item">
-                <div className="info-label">Eligibility Date</div>
-                <div className="info-value">{moment(employee.eligibilityDate).format('MMM DD, YYYY')}</div>
-              </div>
-            </div>
-
-            {!employee.isEligible && (
-              <div className="eligibility-info">
-                <p className="eligibility-text">
-                  Will be eligible on: {moment(employee.eligibilityDate).format('MMM DD, YYYY')}
-                </p>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {!isAdmin && (
-        <div className="leave-request-section">
-          <h2 className="section-title">Request Paid Leave</h2>
-          <Form onSubmit={handleSubmit}>
-            <Form.Group controlId="startDate" className="mb-3">
-              <Form.Label>
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                Start Date
-              </Form.Label>
-              <Form.Control
-                type="date"
-                name="startDate"
-                value={formData.startDate}
-                onChange={handleChange}
-                required
-                min={moment().format('YYYY-MM-DD')}
-              />
-            </Form.Group>
-            <Form.Group controlId="endDate" className="mb-3">
-              <Form.Label>
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                End Date
-              </Form.Label>
-              <Form.Control
-                type="date"
-                name="endDate"
-                value={formData.endDate}
-                onChange={handleChange}
-                required
-                min={formData.startDate || moment().format('YYYY-MM-DD')}
-              />
-            </Form.Group>
-            <Form.Group controlId="reason" className="mb-3">
-              <Form.Label>
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                </svg>
-                Reason
-              </Form.Label>
-              <Form.Control
-                as="textarea"
-                name="reason"
-                value={formData.reason}
-                onChange={handleChange}
-                required
-                rows={4}
-                placeholder="Enter reason for paid leave"
-              />
-            </Form.Group>
-            <Button variant="primary" type="submit">
-              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: '20px', height: '20px', marginRight: '8px' }}>
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-              </svg>
-              Request Paid Leave
-            </Button>
-          </Form>
+      <section className="paid-hero">
+        <div>
+          <p className="paid-eyebrow">{isAdmin ? 'Paid leave control' : 'Paid leave balance'}</p>
+          <h2 className="paid-title">{isAdmin ? 'Paid Leaves' : 'My Paid Leaves'}</h2>
+          <p className="paid-subtitle">Review eligibility, balances, and approval status from live HR records.</p>
         </div>
-      )}
+        {!isAdmin && (
+          <div className="paid-request-card">
+            <p className="paid-eyebrow">Requested days</p>
+            <strong>{requestedDays}</strong>
+            <p className="paid-subtitle">Available balance: {leaveBalances.paidLeaveBalance || 0}</p>
+          </div>
+        )}
+      </section>
+
+      {error && <Alert variant="danger">{error}</Alert>}
+      {success && <Alert variant="success">{success}</Alert>}
+
+      <section className="paid-stat-grid">
+        <div className="paid-stat"><span>Total Paid Requests</span><strong>{leaves.length}</strong></div>
+        <div className="paid-stat"><span>Pending</span><strong>{summary.pending || 0}</strong></div>
+        <div className="paid-stat"><span>Approved</span><strong>{summary.approved || 0}</strong></div>
+        <div className="paid-stat"><span>Eligible Employees</span><strong>{isAdmin ? employeeSummary.eligible : (leaveData[0]?.isEligible ? 1 : 0)}</strong></div>
+        <div className="paid-stat"><span>{isAdmin ? 'Remaining Balance' : 'My Balance'}</span><strong>{isAdmin ? employeeSummary.remaining : leaveBalances.paidLeaveBalance}</strong></div>
+      </section>
+
+      <section className="paid-grid">
+        <div className="paid-panel">
+          <div className="paid-panel-head">
+            <h3 className="paid-panel-title">{isAdmin ? 'Employee eligibility' : 'Paid leave request'}</h3>
+            <Button variant="outline-primary" size="sm" onClick={refreshData} disabled={loading}>Refresh</Button>
+          </div>
+
+          {!isAdmin && (
+            <Form onSubmit={handleSubmit} className="mb-4">
+              <Row className="g-3">
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>Start Date</Form.Label>
+                    <Form.Control type="date" name="startDate" value={formData.startDate} onChange={handleChange} min={moment().format('YYYY-MM-DD')} required />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>End Date</Form.Label>
+                    <Form.Control type="date" name="endDate" value={formData.endDate} onChange={handleChange} min={formData.startDate || moment().format('YYYY-MM-DD')} required />
+                  </Form.Group>
+                </Col>
+                <Col xs={12}>
+                  <Form.Group>
+                    <Form.Label>Reason</Form.Label>
+                    <Form.Control as="textarea" rows={4} name="reason" value={formData.reason} onChange={handleChange} placeholder="Enter reason for paid leave" required />
+                  </Form.Group>
+                </Col>
+                <Col xs={12}>
+                  <Button type="submit" disabled={submitting}>{submitting ? 'Submitting...' : 'Request Paid Leave'}</Button>
+                </Col>
+              </Row>
+            </Form>
+          )}
+
+          {loading ? (
+            <div className="paid-empty"><Spinner animation="border" size="sm" className="me-2" /> Loading paid leave data...</div>
+          ) : (
+            <div className="paid-employee-list">
+              {leaveData.length ? leaveData.map((employee) => (
+                <article className="paid-employee-card" key={employee.employeeId || employee._id || employee.name}>
+                  <div className="paid-person">
+                    <div className="paid-avatar">{String(employee.name || 'E').charAt(0).toUpperCase()}</div>
+                    <div>
+                      <strong>{employee.name || 'Employee'}</strong>
+                      <span>ID: {employee.employeeId || 'N/A'}</span>
+                    </div>
+                    <Badge bg={employee.isEligible ? 'success' : 'warning'} className="ms-auto">
+                      {employee.isEligible ? 'Eligible' : 'Not Eligible'}
+                    </Badge>
+                  </div>
+                  <div className="paid-mini-grid">
+                    <div className="paid-mini"><span>Remaining</span><strong>{employee.remainingLeaves ?? 0}</strong></div>
+                    <div className="paid-mini"><span>Used</span><strong>{employee.usedPaidLeaves || 0}</strong></div>
+                    <div className="paid-mini"><span>Joining</span><strong>{employee.joiningDate ? moment(employee.joiningDate).format('DD MMM YYYY') : 'N/A'}</strong></div>
+                    <div className="paid-mini"><span>Eligible From</span><strong>{employee.eligibilityDate ? moment(employee.eligibilityDate).format('DD MMM YYYY') : 'N/A'}</strong></div>
+                  </div>
+                </article>
+              )) : (
+                <div className="paid-empty">No employee paid leave data available</div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="paid-panel">
+          <div className="paid-panel-head">
+            <h3 className="paid-panel-title">Paid leave pipeline</h3>
+            <span className="paid-meta">{filteredLeaves.length} records</span>
+          </div>
+          <div className="paid-controls">
+            <Form.Control value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search employee or reason" />
+            <Form.Select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+              <option value="all">All status</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </Form.Select>
+          </div>
+
+          {loading ? (
+            <div className="paid-empty"><Spinner animation="border" size="sm" className="me-2" /> Loading paid leave requests...</div>
+          ) : (
+            <>
+              <div className="paid-table-wrap table-responsive">
+                <Table hover>
+                  <thead>
+                    <tr>
+                      <th>Employee</th>
+                      <th>Date Range</th>
+                      <th>Days</th>
+                      <th>Reason</th>
+                      <th>Status</th>
+                      {isAdmin && <th>Action</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedLeaves.length ? paginatedLeaves.map((leave) => {
+                      const statusMeta = getStatusMeta(leave.status);
+                      return (
+                        <tr key={leave._id}>
+                          <td><strong>{getEmployeeName(leave)}</strong><br /><span className="paid-meta">{getEmployeeCode(leave)}</span></td>
+                          <td>{moment(leave.startDate).format('DD MMM YYYY')} - {moment(leave.endDate).format('DD MMM YYYY')}</td>
+                          <td>{getLeaveDays(leave.startDate, leave.endDate)}</td>
+                          <td>{leave.reason || '-'}</td>
+                          <td><Badge bg={statusMeta.variant}>{statusMeta.label}</Badge></td>
+                          {isAdmin && (
+                            <td>
+                              <Button variant="success" size="sm" className="me-2" onClick={() => handleStatus(leave._id, 'approved')} disabled={leave.status !== 'pending'}>Approve</Button>
+                              <Button variant="danger" size="sm" onClick={() => handleStatus(leave._id, 'rejected')} disabled={leave.status !== 'pending'}>Reject</Button>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    }) : (
+                      <tr><td colSpan={isAdmin ? 6 : 5} className="text-center text-muted py-4">No paid leave requests found</td></tr>
+                    )}
+                  </tbody>
+                </Table>
+              </div>
+
+              {filteredLeaves.length > limit && (
+                <PaginationControls
+                  page={page}
+                  limit={limit}
+                  total={filteredLeaves.length}
+                  label="paid leave requests"
+                  onPageChange={setPage}
+                  onLimitChange={(nextLimit) => {
+                    setLimit(nextLimit);
+                    setPage(1);
+                  }}
+                />
+              )}
+            </>
+          )}
+        </div>
+      </section>
     </div>
   );
 };

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Button, Alert, Pagination, Form, Row, Col, Spinner } from 'react-bootstrap';
-import axios from 'axios';
 import moment from 'moment';
+import api from '../utils/axios';
 
 const AttendanceList = ({ status }) => {
   const [attendances, setAttendances] = useState([]);
@@ -22,14 +22,15 @@ const AttendanceList = ({ status }) => {
         params.startDate = startDate;
         params.endDate = endDate;
       }
-      const response = await axios.get(`${process.env.REACT_APP_API_URL}/attendance/${status}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      const response = await api.get(`/attendance/${status}`, {
         params,
       });
-      setAttendances(response.data.attendances);
-      setTotalPages(response.data.totalPages);
-      setCurrentPage(response.data.currentPage);
-      setTotal(response.data.total);
+      const rows = response.data.data || response.data.attendances || [];
+      const pagination = response.data.pagination || {};
+      setAttendances(rows);
+      setTotalPages(Number(pagination.totalPages || response.data.totalPages || 1));
+      setCurrentPage(Number(pagination.page || response.data.currentPage || page));
+      setTotal(Number(pagination.total || response.data.total || rows.length));
       setError('');
     } catch (err) {
       console.error(`Error fetching ${status} attendances:`, err);
@@ -54,8 +55,12 @@ const AttendanceList = ({ status }) => {
   const handleClearFilter = () => {
     setStartDate('');
     setEndDate('');
-    fetchAttendances(1);
+    setCurrentPage(1);
   };
+
+  useEffect(() => {
+    if (!startDate && !endDate) fetchAttendances(1);
+  }, [startDate, endDate]);
 
   const renderPagination = () => {
     const items = [];

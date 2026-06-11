@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Table, Button, Alert, Modal, Form } from 'react-bootstrap';
 import moment from 'moment';
+import PaginationControls from './PaginationControls';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'animate.css';
 
@@ -18,6 +19,9 @@ const EmployeeReimbursement = () => {
     attachments: []
   });
   const [selectedFiles, setSelectedFiles] = useState([]);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const paginatedReimbursements = reimbursements.slice((page - 1) * limit, page * limit);
 
   useEffect(() => {
     fetchReimbursements();
@@ -29,6 +33,7 @@ const EmployeeReimbursement = () => {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       });
       setReimbursements(res.data.data || []);
+      setPage(1);
       setError('');
     } catch (err) {
       console.error('Fetch reimbursements error:', err.response?.status, err.response?.data);
@@ -290,8 +295,8 @@ const EmployeeReimbursement = () => {
               </tr>
             </thead>
             <tbody>
-              {reimbursements.length > 0 ? (
-                reimbursements.map((reimbursement, index) => (
+              {paginatedReimbursements.length > 0 ? (
+                paginatedReimbursements.map((reimbursement, index) => (
                   <tr key={reimbursement._id} className="animate__animated animate__fadeIn" style={{ animationDelay: `${0.05 * index}s` }}>
                     <td>
                       <span style={{ fontSize: '1.2rem', marginRight: '0.5rem' }}>
@@ -354,6 +359,19 @@ const EmployeeReimbursement = () => {
               )}
             </tbody>
           </Table>
+          {reimbursements.length > limit && (
+            <PaginationControls
+              page={page}
+              limit={limit}
+              total={reimbursements.length}
+              label="reimbursements"
+              onPageChange={setPage}
+              onLimitChange={(nextLimit) => {
+                setLimit(nextLimit);
+                setPage(1);
+              }}
+            />
+          )}
         </div>
 
         <Modal show={showModal} onHide={() => setShowModal(false)} size="lg">

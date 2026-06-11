@@ -1,301 +1,351 @@
-import React, { useState, useEffect } from 'react';
-import { Card, Table, Button, Alert, Badge } from 'react-bootstrap';
-import axios from 'axios';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Alert, Badge, Button, Spinner } from 'react-bootstrap';
+import moment from 'moment';
+import api from '../utils/axios';
+import PaginationControls from './PaginationControls';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import 'animate.css';
+
+const getStatusMeta = (status) => {
+  const normalized = String(status || 'pending').toLowerCase();
+  if (normalized === 'completed') return { label: 'Completed', variant: 'success', className: 'completed' };
+  if (normalized === 'in-progress') return { label: 'In Progress', variant: 'warning', className: 'in-progress' };
+  return { label: 'Pending', variant: 'secondary', className: 'pending' };
+};
+
+const getPriorityMeta = (priority) => {
+  const normalized = String(priority || 'medium').toLowerCase();
+  if (normalized === 'urgent') return { label: 'Urgent', className: 'urgent' };
+  if (normalized === 'high') return { label: 'High', className: 'high' };
+  if (normalized === 'low') return { label: 'Low', className: 'low' };
+  return { label: 'Medium', className: 'medium' };
+};
 
 const EmployeeTasks = () => {
   const [tasks, setTasks] = useState([]);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
 
-  useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        const res = await axios.get(`${process.env.REACT_APP_API_URL}/tasks/my-tasks`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        });
-        setTasks(res.data.data || []);
-        setError('');
-      } catch (err) {
-        setError(err.response?.data?.message || 'Failed to fetch tasks');
-        console.error('Error fetching tasks:', err);
-      }
-    };
-    fetchTasks();
-  }, []);
+  const paginatedTasks = tasks.slice((page - 1) * limit, page * limit);
 
-  const handleStatusUpdate = async (taskId, status) => {
+  const fetchTasks = async () => {
+    setLoading(true);
     try {
-      await axios.put(
-        `${process.env.REACT_APP_API_URL}/tasks/${taskId}`,
-        { status },
-        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
-      );
-      setMessage('Task status updated successfully');
+      const res = await api.get('/tasks/my-tasks');
+      setTasks(res.data.data || []);
+      setPage(1);
       setError('');
-      // Update local state
-      setTasks(tasks.map(task =>
-        task._id === taskId ? { ...task, status } : task
-      ));
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to update task status');
-      console.error('Error updating task:', err);
+      setError(err.response?.data?.message || 'Failed to fetch tasks');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'completed':
-        return <Badge bg="success">Completed</Badge>;
-      case 'in-progress':
-        return <Badge bg="warning">In Progress</Badge>;
-      case 'pending':
-      default:
-        return <Badge bg="secondary">Pending</Badge>;
+  useEffect(() => {
+    fetchTasks();
+  }, []);
+
+  const summary = useMemo(() => {
+    return tasks.reduce((acc, task) => {
+      const status = String(task.status || 'pending').toLowerCase();
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    }, { pending: 0, 'in-progress': 0, completed: 0 });
+  }, [tasks]);
+
+  const completionRate = tasks.length ? Math.round(((summary.completed || 0) / tasks.length) * 100) : 0;
+
+  const handleStatusUpdate = async (taskId, status) => {
+    try {
+      await api.put(`/tasks/${taskId}`, { status });
+      setMessage(status === 'completed' ? 'Task marked as completed' : 'Task moved to in progress');
+      setError('');
+      setTasks((currentTasks) => currentTasks.map((task) => (
+        task._id === taskId ? { ...task, status } : task
+      )));
+    } catch (err) {
+      setMessage('');
+      setError(err.response?.data?.message || 'Failed to update task status');
     }
   };
 
   return (
-    <div className="tasks-container">
+    <div className="employee-task-page">
       <style>
         {`
-          @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
-
-          .tasks-container {
-            font-family: 'Poppins', sans-serif;
-            color: #1e40af;
+          .employee-task-page {
+            color: #0f172a;
+            display: grid;
+            gap: 1rem;
+          }
+          .task-hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 1rem;
+            align-items: center;
+            padding: 1.15rem;
+            background: linear-gradient(135deg, #ffffff, #f8fbff);
+            border: 1px solid #dbeafe;
+            border-radius: 0.9rem;
+            box-shadow: 0 16px 36px rgba(15, 23, 42, 0.07);
+          }
+          .task-eyebrow {
+            margin: 0;
+            color: #64748b;
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+          }
+          .task-title {
+            margin: 0.25rem 0;
+            color: #0f172a;
+            font-size: clamp(1.45rem, 3vw, 2.1rem);
+            font-weight: 900;
+            line-height: 1.15;
+          }
+          .task-subtitle {
+            margin: 0;
+            color: #64748b;
+            font-weight: 600;
+          }
+          .task-progress-card {
+            min-width: 260px;
             background: #ffffff;
-            padding: 1.5rem;
-            border-radius: 1rem;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-            margin: 1rem auto;
-            max-width: 100%;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.85rem;
+            padding: 0.9rem;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
           }
-          .tasks-title {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #1e40af;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            margin-bottom: 2rem;
-            text-align: center;
+          .task-progress-card strong {
+            display: block;
+            color: #0f172a;
+            font-size: 1.8rem;
+            line-height: 1;
           }
-          .alert-danger {
-            border-radius: 0.6rem;
-            border: 2px solid #f87171;
-            background: #fef2f2;
-            color: #b91c1c;
-            margin-bottom: 1.5rem;
+          .task-progress-track {
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 999px;
+            overflow: hidden;
+            margin-top: 0.75rem;
+          }
+          .task-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #2563eb, #14b8a6);
+            border-radius: inherit;
+          }
+          .task-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.85rem;
+          }
+          .task-summary-card,
+          .task-card,
+          .task-panel {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.85rem;
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+          }
+          .task-summary-card {
+            padding: 0.95rem;
+          }
+          .task-summary-card span {
+            display: block;
+            color: #64748b;
+            font-size: 0.76rem;
+            font-weight: 800;
+            text-transform: uppercase;
+          }
+          .task-summary-card strong {
+            display: block;
+            margin-top: 0.28rem;
+            color: #0f172a;
+            font-size: 1.55rem;
+            line-height: 1.1;
+          }
+          .task-panel {
             padding: 1rem;
-            font-size: 1rem;
-            transition: transform 0.3s ease, opacity 0.3s ease;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
           }
-          .alert-success {
-            border-radius: 0.6rem;
-            border: 2px solid #22c55e;
-            background: #f0fdf4;
-            color: #15803d;
-            margin-bottom: 1.5rem;
+          .task-list {
+            display: grid;
+            gap: 0.85rem;
+          }
+          .task-card {
             padding: 1rem;
-            font-size: 1rem;
-            transition: transform 0.3s ease, opacity 0.3s ease;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 1rem;
+            align-items: start;
           }
-          .card {
+          .task-card-title {
+            margin: 0;
+            color: #0f172a;
+            font-size: 1.05rem;
+            font-weight: 900;
+          }
+          .task-card-desc {
+            margin: 0.45rem 0 0;
+            color: #64748b;
+            font-weight: 600;
+            line-height: 1.55;
+          }
+          .task-meta-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.85rem;
+          }
+          .task-pill {
+            border-radius: 999px;
+            padding: 0.38rem 0.62rem;
+            background: #f1f5f9;
+            color: #475569;
+            border: 1px solid #e2e8f0;
+            font-size: 0.76rem;
+            font-weight: 800;
+          }
+          .task-priority.urgent { color: #b91c1c; background: #fee2e2; border-color: #fecaca; }
+          .task-priority.high { color: #c2410c; background: #ffedd5; border-color: #fed7aa; }
+          .task-priority.medium { color: #1d4ed8; background: #dbeafe; border-color: #bfdbfe; }
+          .task-priority.low { color: #047857; background: #d1fae5; border-color: #a7f3d0; }
+          .task-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 0.55rem;
+            min-width: 130px;
+          }
+          .task-action-btn {
+            border-radius: 0.65rem;
+            font-weight: 800;
+          }
+          .task-empty {
+            min-height: 220px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            border: 1px dashed #cbd5e1;
             border-radius: 0.8rem;
-            border: 2px solid rgba(30, 64, 175, 0.2);
             background: #f8fafc;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            width: 100%;
-            color: #1e40af;
-            overflow: hidden;
-          }
-          .card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
-          }
-          .card-body {
-            padding: 1.5rem;
-          }
-          .table {
-            background: #ffffff;
-            border-radius: 0.6rem;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-          }
-          .table th {
-            background: linear-gradient(90deg, #1e40af, #3b82f6);
-            color: #fff;
-            font-weight: 600;
-            border: none;
+            font-weight: 700;
+            text-align: center;
             padding: 1rem;
           }
-          .table td {
-            padding: 1rem;
-            border: none;
-            vertical-align: middle;
-          }
-          .table tbody tr:nth-child(even) {
-            background: #f8fafc;
-          }
-          .table tbody tr:hover {
-            background: #e0f2fe;
-          }
-          .btn-primary {
-            border-radius: 0.6rem;
-            padding: 0.5rem 1rem;
-            font-weight: 600;
-            font-size: 0.9rem;
-            position: relative;
-            overflow: hidden;
-            transition: all 0.3s ease;
-            border: 2px solid #3b82f6;
-            background: linear-gradient(90deg, #f0f9ff, #bfdbfe);
-            color: #1e40af;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-          }
-          .btn-primary::before {
-            content: '';
-            position: absolute;
-            left: -100%;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.4), transparent);
-            transition: left 0.4s ease;
-          }
-          .btn-primary:hover::before {
-            left: 100%;
-          }
-          .btn-primary:hover {
-            background: linear-gradient(90deg, #1e40af, #3b82f6) !important;
-            border-color: #3b82f6 !important;
-            color: #fff !important;
-            transform: scale(1.05);
-            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.5);
-          }
-          .btn-success {
-            border-radius: 0.6rem;
-            padding: 0.5rem 1rem;
-            font-weight: 600;
-            font-size: 0.9rem;
-            position: relative;
-            overflow: hidden;
-            transition: all 0.3s ease;
-            border: 2px solid #22c55e;
-            background: linear-gradient(90deg, #f0fdf4, #bbf7d0);
-            color: #15803d;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-          }
-          .btn-success::before {
-            content: '';
-            position: absolute;
-            left: -100%;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(34, 197, 94, 0.4), transparent);
-            transition: left 0.4s ease;
-          }
-          .btn-success:hover::before {
-            left: 100%;
-          }
-          .btn-success:hover {
-            background: linear-gradient(90deg, #15803d, #22c55e) !important;
-            border-color: #22c55e !important;
-            color: #fff !important;
-            transform: scale(1.05);
-            box-shadow: 0 6px 16px rgba(34, 197, 94, 0.5);
-          }
-          @media (max-width: 768px) {
-            .tasks-container {
-              padding: 1rem;
-              margin: 0.5rem;
+          @media (max-width: 900px) {
+            .task-hero {
+              grid-template-columns: 1fr;
             }
-            .tasks-title {
-              font-size: 1.6rem;
-              margin-bottom: 1.5rem;
+            .task-progress-card {
+              min-width: 0;
             }
-            .table th, .table td {
-              padding: 0.5rem;
-              font-size: 0.9rem;
+            .task-summary-grid {
+              grid-template-columns: repeat(2, minmax(0, 1fr));
             }
-            .btn-primary, .btn-success {
-              padding: 0.4rem 0.8rem;
-              font-size: 0.8rem;
+          }
+          @media (max-width: 620px) {
+            .task-card {
+              grid-template-columns: 1fr;
+            }
+            .task-actions {
+              min-width: 0;
+            }
+            .task-summary-grid {
+              grid-template-columns: 1fr;
             }
           }
         `}
       </style>
-      <div className="tasks-container animate__animated animate__fadeIn">
-        <h3 className="tasks-title animate__animated animate__zoomIn">My Tasks</h3>
-        {error && (
-          <Alert variant="danger" className="animate__animated animate__shakeX">
-            {error}
-          </Alert>
+
+      <section className="task-hero">
+        <div>
+          <p className="task-eyebrow">Employee tasks</p>
+          <h2 className="task-title">My Tasks</h2>
+          <p className="task-subtitle">Track assigned work, priority, due dates, and progress from live task records.</p>
+        </div>
+        <div className="task-progress-card">
+          <p className="task-eyebrow">Completion</p>
+          <strong>{completionRate}%</strong>
+          <div className="task-progress-track">
+            <div className="task-progress-fill" style={{ width: `${completionRate}%` }} />
+          </div>
+        </div>
+      </section>
+
+      {error && <Alert variant="danger">{error}</Alert>}
+      {message && <Alert variant="success">{message}</Alert>}
+
+      <section className="task-summary-grid">
+        <div className="task-summary-card"><span>Total Tasks</span><strong>{tasks.length}</strong></div>
+        <div className="task-summary-card"><span>Pending</span><strong>{summary.pending || 0}</strong></div>
+        <div className="task-summary-card"><span>In Progress</span><strong>{summary['in-progress'] || 0}</strong></div>
+        <div className="task-summary-card"><span>Completed</span><strong>{summary.completed || 0}</strong></div>
+      </section>
+
+      <section className="task-panel">
+        {loading ? (
+          <div className="task-empty">
+            <Spinner animation="border" size="sm" className="me-2" /> Loading tasks...
+          </div>
+        ) : paginatedTasks.length > 0 ? (
+          <div className="task-list">
+            {paginatedTasks.map((task) => {
+              const statusMeta = getStatusMeta(task.status);
+              const priorityMeta = getPriorityMeta(task.priority);
+              return (
+                <article className="task-card" key={task._id}>
+                  <div>
+                    <h3 className="task-card-title">{task.title || 'Untitled task'}</h3>
+                    <p className="task-card-desc">{task.description || 'No description added.'}</p>
+                    <div className="task-meta-row">
+                      <Badge bg={statusMeta.variant}>{statusMeta.label}</Badge>
+                      <span className={`task-pill task-priority ${priorityMeta.className}`}>{priorityMeta.label} priority</span>
+                      <span className="task-pill">Due {task.dueDate ? moment(task.dueDate).format('DD MMM YYYY') : 'N/A'}</span>
+                    </div>
+                  </div>
+                  <div className="task-actions">
+                    {task.status === 'pending' && (
+                      <Button className="task-action-btn" variant="primary" onClick={() => handleStatusUpdate(task._id, 'in-progress')}>
+                        Start Task
+                      </Button>
+                    )}
+                    {task.status === 'in-progress' && (
+                      <Button className="task-action-btn" variant="success" onClick={() => handleStatusUpdate(task._id, 'completed')}>
+                        Complete
+                      </Button>
+                    )}
+                    {task.status === 'completed' && (
+                      <Button className="task-action-btn" variant="outline-success" disabled>
+                        Done
+                      </Button>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="task-empty">No tasks assigned yet.</div>
         )}
-        {message && (
-          <Alert variant="success" className="animate__animated animate__fadeIn">
-            {message}
-          </Alert>
+
+        {tasks.length > limit && (
+          <PaginationControls
+            page={page}
+            limit={limit}
+            total={tasks.length}
+            label="tasks"
+            onPageChange={setPage}
+            onLimitChange={(nextLimit) => {
+              setLimit(nextLimit);
+              setPage(1);
+            }}
+          />
         )}
-        <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.1s' }}>
-          <Card.Body>
-            <Table striped bordered hover responsive>
-              <thead>
-                <tr>
-                  <th>Title</th>
-                  <th>Description</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tasks.length > 0 ? (
-                  tasks.map((task) => (
-                    <tr key={task._id}>
-                      <td>{task.title || 'N/A'}</td>
-                      <td>{task.description || 'N/A'}</td>
-                      <td>{getStatusBadge(task.status)}</td>
-                      <td>
-                        {task.status !== 'completed' && (
-                          <>
-                            {task.status === 'pending' && (
-                              <Button
-                                variant="primary"
-                                size="sm"
-                                onClick={() => handleStatusUpdate(task._id, 'in-progress')}
-                                className="me-2"
-                              >
-                                Start
-                              </Button>
-                            )}
-                            {task.status === 'in-progress' && (
-                              <Button
-                                variant="success"
-                                size="sm"
-                                onClick={() => handleStatusUpdate(task._id, 'completed')}
-                              >
-                                Complete
-                              </Button>
-                            )}
-                          </>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="4" className="text-center">No tasks assigned</td>
-                  </tr>
-                )}
-              </tbody>
-            </Table>
-          </Card.Body>
-        </Card>
-      </div>
+      </section>
     </div>
   );
 };

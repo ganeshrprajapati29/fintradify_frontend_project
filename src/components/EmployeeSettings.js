@@ -1,77 +1,68 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { Container, Card, Form, Button, Alert, Row, Col } from 'react-bootstrap';
-import { FaSave, FaUser, FaBell } from 'react-icons/fa';
+import React, { useEffect, useState } from 'react';
+import { Alert, Button, Col, Form, Row, Spinner } from 'react-bootstrap';
+import api from '../utils/axios';
+
+const defaultPreferences = {
+  theme: 'light',
+  language: 'en',
+  dateFormat: 'DD/MM/YYYY',
+  timeFormat: '12h',
+  currency: 'INR',
+  emailNotifications: true,
+  pushNotifications: true,
+};
 
 const EmployeeSettings = () => {
-  const [settings, setSettings] = useState({});
+  const [systemSettings, setSystemSettings] = useState({});
+  const [preferences, setPreferences] = useState(defaultPreferences);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Form states
-  const [personalSettings, setPersonalSettings] = useState({});
-  const [notificationSettings, setNotificationSettings] = useState({});
-
   useEffect(() => {
+    const fetchSettings = async () => {
+      setLoading(true);
+      try {
+        const [settingsRes] = await Promise.all([
+          api.get('/settings/employee'),
+        ]);
+        const settings = settingsRes.data?.data || settingsRes.data || {};
+        const saved = JSON.parse(localStorage.getItem('employeeSettings') || '{}');
+        setSystemSettings(settings);
+        setPreferences({
+          ...defaultPreferences,
+          theme: settings.theme || defaultPreferences.theme,
+          language: settings.language || defaultPreferences.language,
+          dateFormat: settings.dateFormat || defaultPreferences.dateFormat,
+          timeFormat: settings.timeFormat || defaultPreferences.timeFormat,
+          currency: settings.currency || defaultPreferences.currency,
+          ...saved,
+        });
+        setError('');
+      } catch (err) {
+        setError(err.response?.data?.message || 'Failed to fetch employee settings');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchSettings();
   }, []);
 
-  const fetchSettings = async () => {
-    try {
-      const res = await axios.get(`${process.env.REACT_APP_API_URL}/settings/employee`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      });
-      setSettings(res.data);
-      initializeFormStates(res.data);
-      setError('');
-    } catch (err) {
-      console.error('Error fetching settings:', err);
-      setError('Failed to fetch settings');
-    } finally {
-      setLoading(false);
-    }
+  const updatePreference = (field, value) => {
+    setPreferences((current) => ({ ...current, [field]: value }));
   };
 
-  const initializeFormStates = (data) => {
-    setPersonalSettings({
-      theme: data.theme || 'light',
-      language: data.language || 'en',
-      dateFormat: data.dateFormat || 'DD/MM/YYYY',
-      timeFormat: data.timeFormat || '12h',
-      currency: data.currency || 'INR',
-    });
-
-    setNotificationSettings({
-      emailNotifications: data.emailNotifications ?? true,
-      pushNotifications: data.pushNotifications ?? true,
-    });
-  };
-
-  const handleSave = async (section) => {
+  const savePreferences = () => {
     setSaving(true);
     setError('');
     setSuccess('');
-
     try {
-      let updateData = {};
-
-      if (section === 'personal') {
-        updateData = personalSettings;
-      } else if (section === 'notifications') {
-        updateData = notificationSettings;
-      }
-
-      // For employee settings, we'll update via a general settings endpoint
-      // Since employees can't modify system-wide settings, we'll store their preferences locally
-      localStorage.setItem('employeeSettings', JSON.stringify(updateData));
-
-      setSuccess(`${section.charAt(0).toUpperCase() + section.slice(1)} settings saved successfully!`);
-      setTimeout(() => setSuccess(''), 3000);
+      localStorage.setItem('employeeSettings', JSON.stringify(preferences));
+      setSuccess('Preferences saved successfully');
     } catch (err) {
-      console.error('Error saving settings:', err);
-      setError('Failed to save settings');
+      setError('Unable to save preferences on this browser');
     } finally {
       setSaving(false);
     }
@@ -79,195 +70,268 @@ const EmployeeSettings = () => {
 
   if (loading) {
     return (
-      <Container className="py-5">
-        <div className="text-center">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </div>
-          <p className="mt-2">Loading settings...</p>
+      <div className="employee-settings-page">
+        <div className="settings-empty">
+          <Spinner animation="border" size="sm" className="me-2" /> Loading settings...
         </div>
-      </Container>
+      </div>
     );
   }
 
   return (
-    <Container fluid className="py-4">
-      <div className="d-flex justify-content-center mb-4">
-        <h2 className="text-primary-800">
-          <FaUser className="me-2" />
-          My Settings
-        </h2>
-      </div>
+    <div className="employee-settings-page">
+      <style>
+        {`
+          .employee-settings-page {
+            color: #0f172a;
+            display: grid;
+            gap: 1rem;
+          }
+          .settings-hero,
+          .settings-panel,
+          .settings-summary-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.9rem;
+            box-shadow: 0 14px 34px rgba(15, 23, 42, 0.07);
+          }
+          .settings-hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 1rem;
+            align-items: center;
+            padding: 1.15rem;
+            background: linear-gradient(135deg, #ffffff, #f8fbff);
+          }
+          .settings-eyebrow {
+            margin: 0;
+            color: #64748b;
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+          }
+          .settings-title {
+            margin: 0.25rem 0;
+            color: #0f172a;
+            font-size: clamp(1.45rem, 3vw, 2.1rem);
+            font-weight: 900;
+            line-height: 1.15;
+          }
+          .settings-subtitle {
+            margin: 0;
+            color: #64748b;
+            font-weight: 600;
+          }
+          .settings-action-btn {
+            border-radius: 0.65rem;
+            font-weight: 800;
+            min-height: 42px;
+          }
+          .settings-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.85rem;
+          }
+          .settings-summary-card {
+            padding: 0.95rem;
+          }
+          .settings-summary-card span {
+            display: block;
+            color: #64748b;
+            font-size: 0.76rem;
+            font-weight: 800;
+            text-transform: uppercase;
+          }
+          .settings-summary-card strong {
+            display: block;
+            margin-top: 0.28rem;
+            color: #0f172a;
+            font-size: 1rem;
+            line-height: 1.25;
+          }
+          .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1rem;
+          }
+          .settings-panel {
+            padding: 1rem;
+          }
+          .settings-panel-title {
+            margin: 0 0 1rem;
+            color: #0f172a;
+            font-size: 1.05rem;
+            font-weight: 900;
+          }
+          .employee-settings-page .form-label {
+            color: #334155;
+            font-weight: 800;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+          }
+          .employee-settings-page .form-select,
+          .employee-settings-page .form-check-input {
+            border-color: #dbe3ef;
+          }
+          .employee-settings-page .form-select {
+            border-radius: 0.65rem;
+            color: #0f172a;
+            min-height: 42px;
+            font-weight: 600;
+          }
+          .settings-policy-list {
+            display: grid;
+            gap: 0.65rem;
+          }
+          .settings-policy-item {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.75rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.7rem;
+            background: #f8fafc;
+            color: #64748b;
+            font-weight: 700;
+          }
+          .settings-policy-item strong {
+            color: #0f172a;
+            text-align: right;
+          }
+          .settings-empty {
+            min-height: 220px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            border: 1px dashed #cbd5e1;
+            border-radius: 0.8rem;
+            background: #f8fafc;
+            font-weight: 700;
+            text-align: center;
+            padding: 1rem;
+          }
+          @media (max-width: 900px) {
+            .settings-hero,
+            .settings-grid {
+              grid-template-columns: 1fr;
+            }
+            .settings-summary-grid {
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+          }
+          @media (max-width: 560px) {
+            .settings-summary-grid {
+              grid-template-columns: 1fr;
+            }
+            .settings-action-btn {
+              width: 100%;
+            }
+          }
+        `}
+      </style>
+
+      <section className="settings-hero">
+        <div>
+          <p className="settings-eyebrow">Employee settings</p>
+          <h2 className="settings-title">Settings</h2>
+          <p className="settings-subtitle">Your preferences are saved locally. Company policies and work rules come from backend settings.</p>
+        </div>
+        <Button className="settings-action-btn" variant="primary" onClick={savePreferences} disabled={saving}>
+          {saving ? 'Saving...' : 'Save Preferences'}
+        </Button>
+      </section>
 
       {error && <Alert variant="danger">{error}</Alert>}
       {success && <Alert variant="success">{success}</Alert>}
 
-      <Row>
-        <Col lg={6} className="mb-4">
-          <Card className="shadow-sm h-100">
-            <Card.Header className="bg-primary text-white">
-              <h5 className="mb-0">
-                <FaUser className="me-2" />
-                Personal Preferences
-              </h5>
-            </Card.Header>
-            <Card.Body>
-              <Form.Group className="mb-3">
+      <section className="settings-summary-grid">
+        <div className="settings-summary-card"><span>Timezone</span><strong>{systemSettings.timezone || 'Asia/Kolkata'}</strong></div>
+        <div className="settings-summary-card"><span>Work Hours</span><strong>{systemSettings.workStartTime || '09:00'} - {systemSettings.workEndTime || '18:00'}</strong></div>
+        <div className="settings-summary-card"><span>Currency</span><strong>{preferences.currency}</strong></div>
+        <div className="settings-summary-card"><span>Theme</span><strong>{preferences.theme}</strong></div>
+      </section>
+
+      <section className="settings-grid">
+        <div className="settings-panel">
+          <h3 className="settings-panel-title">Personal preferences</h3>
+          <Row className="g-3">
+            <Col md={6}>
+              <Form.Group>
                 <Form.Label>Theme</Form.Label>
-                <Form.Select
-                  value={personalSettings.theme}
-                  onChange={(e) => setPersonalSettings({...personalSettings, theme: e.target.value})}
-                >
+                <Form.Select value={preferences.theme} onChange={(event) => updatePreference('theme', event.target.value)}>
                   <option value="light">Light</option>
-                  <option value="dark">Dark</option>
+                  <option value="system">System</option>
                 </Form.Select>
               </Form.Group>
-
-              <Form.Group className="mb-3">
+            </Col>
+            <Col md={6}>
+              <Form.Group>
                 <Form.Label>Language</Form.Label>
-                <Form.Select
-                  value={personalSettings.language}
-                  onChange={(e) => setPersonalSettings({...personalSettings, language: e.target.value})}
-                >
+                <Form.Select value={preferences.language} onChange={(event) => updatePreference('language', event.target.value)}>
                   <option value="en">English</option>
                   <option value="hi">Hindi</option>
-                  <option value="es">Spanish</option>
                 </Form.Select>
               </Form.Group>
-
-              <Form.Group className="mb-3">
+            </Col>
+            <Col md={6}>
+              <Form.Group>
                 <Form.Label>Date Format</Form.Label>
-                <Form.Select
-                  value={personalSettings.dateFormat}
-                  onChange={(e) => setPersonalSettings({...personalSettings, dateFormat: e.target.value})}
-                >
+                <Form.Select value={preferences.dateFormat} onChange={(event) => updatePreference('dateFormat', event.target.value)}>
                   <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                  <option value="MM/DD/YYYY">MM/DD/YYYY</option>
                   <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                  <option value="MMM DD, YYYY">MMM DD, YYYY</option>
                 </Form.Select>
               </Form.Group>
-
-              <Form.Group className="mb-3">
+            </Col>
+            <Col md={6}>
+              <Form.Group>
                 <Form.Label>Time Format</Form.Label>
-                <Form.Select
-                  value={personalSettings.timeFormat}
-                  onChange={(e) => setPersonalSettings({...personalSettings, timeFormat: e.target.value})}
-                >
+                <Form.Select value={preferences.timeFormat} onChange={(event) => updatePreference('timeFormat', event.target.value)}>
                   <option value="12h">12 Hour</option>
                   <option value="24h">24 Hour</option>
                 </Form.Select>
               </Form.Group>
-
-              <Form.Group className="mb-3">
-                <Form.Label>Currency</Form.Label>
-                <Form.Select
-                  value={personalSettings.currency}
-                  onChange={(e) => setPersonalSettings({...personalSettings, currency: e.target.value})}
-                >
-                  <option value="INR">INR (₹)</option>
-                  <option value="USD">USD ($)</option>
-                  <option value="EUR">EUR (€)</option>
-                </Form.Select>
-              </Form.Group>
-
-              <div className="text-end">
-                <Button variant="primary" onClick={() => handleSave('personal')} disabled={saving}>
-                  <FaSave className="me-2" />
-                  {saving ? 'Saving...' : 'Save Preferences'}
-                </Button>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-
-        <Col lg={6} className="mb-4">
-          <Card className="shadow-sm h-100">
-            <Card.Header className="bg-info text-white">
-              <h5 className="mb-0">
-                <FaBell className="me-2" />
-                Notification Preferences
-              </h5>
-            </Card.Header>
-            <Card.Body>
-              <Form.Check
-                type="switch"
-                id="email-notifications"
-                label="Email Notifications"
-                checked={notificationSettings.emailNotifications}
-                onChange={(e) => setNotificationSettings({...notificationSettings, emailNotifications: e.target.checked})}
-                className="mb-3"
-              />
-
-              <Form.Check
-                type="switch"
-                id="push-notifications"
-                label="Push Notifications"
-                checked={notificationSettings.pushNotifications}
-                onChange={(e) => setNotificationSettings({...notificationSettings, pushNotifications: e.target.checked})}
-                className="mb-3"
-              />
-
-              <div className="mt-4 p-3 bg-light rounded">
-                <h6 className="text-muted mb-2">System Information</h6>
-                <p className="mb-1 small">
-                  <strong>Timezone:</strong> {settings.timezone || 'Asia/Kolkata'}
-                </p>
-                <p className="mb-1 small">
-                  <strong>Work Hours:</strong> {settings.workStartTime || '09:00'} - {settings.workEndTime || '18:00'}
-                </p>
-                <p className="mb-0 small">
-                  <strong>Working Days:</strong> {settings.workingDays ? settings.workingDays.join(', ') : 'Monday - Friday'}
-                </p>
-              </div>
-
-              <div className="text-end mt-3">
-                <Button variant="info" onClick={() => handleSave('notifications')} disabled={saving}>
-                  <FaSave className="me-2" />
-                  {saving ? 'Saving...' : 'Save Notifications'}
-                </Button>
-              </div>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-
-      <Card className="shadow-sm">
-        <Card.Header className="bg-secondary text-white">
-          <h5 className="mb-0">Company Policies & Information</h5>
-        </Card.Header>
-        <Card.Body>
-          <Row>
-            <Col md={6}>
-              <h6 className="text-primary-800">Leave Information</h6>
-              <p className="mb-1 small">
-                <strong>Annual Leave:</strong> {settings.annualLeaveDays || 12} days
-              </p>
-              <p className="mb-1 small">
-                <strong>Sick Leave:</strong> {settings.sickLeaveDays || 6} days
-              </p>
-              <p className="mb-1 small">
-                <strong>Casual Leave:</strong> {settings.casualLeaveDays || 6} days
-              </p>
-              <p className="mb-0 small">
-                <strong>Leave Carry Forward:</strong> {settings.allowLeaveCarryForward ? 'Allowed' : 'Not Allowed'}
-              </p>
-            </Col>
-            <Col md={6}>
-              <h6 className="text-primary-800">Attendance Rules</h6>
-              <p className="mb-1 small">
-                <strong>Late Check-in Grace:</strong> {settings.lateCheckInGracePeriod || 15} minutes
-              </p>
-              <p className="mb-1 small">
-                <strong>Early Check-out Grace:</strong> {settings.earlyCheckOutGracePeriod || 15} minutes
-              </p>
-              <p className="mb-0 small">
-                <strong>Break Time:</strong> {settings.breakStartTime || '13:00'} - {settings.breakEndTime || '14:00'}
-              </p>
             </Col>
           </Row>
-        </Card.Body>
-      </Card>
-    </Container>
+        </div>
+
+        <div className="settings-panel">
+          <h3 className="settings-panel-title">Notification preferences</h3>
+          <div className="settings-policy-list">
+            <div className="settings-policy-item">
+              <span>Email notifications</span>
+              <Form.Check
+                type="switch"
+                checked={preferences.emailNotifications}
+                onChange={(event) => updatePreference('emailNotifications', event.target.checked)}
+              />
+            </div>
+            <div className="settings-policy-item">
+              <span>Push notifications</span>
+              <Form.Check
+                type="switch"
+                checked={preferences.pushNotifications}
+                onChange={(event) => updatePreference('pushNotifications', event.target.checked)}
+              />
+            </div>
+            <div className="settings-policy-item"><span>View salary slips</span><strong>{systemSettings.employeeSettings?.canViewSalary === false ? 'Disabled' : 'Allowed'}</strong></div>
+            <div className="settings-policy-item"><span>Request leave</span><strong>{systemSettings.employeeSettings?.canRequestLeave === false ? 'Disabled' : 'Allowed'}</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <section className="settings-panel">
+        <h3 className="settings-panel-title">Company rules</h3>
+        <div className="settings-policy-list">
+          <div className="settings-policy-item"><span>Working days</span><strong>{Array.isArray(systemSettings.workingDays) ? systemSettings.workingDays.join(', ') : 'Monday - Friday'}</strong></div>
+          <div className="settings-policy-item"><span>Date format</span><strong>{systemSettings.dateFormat || preferences.dateFormat}</strong></div>
+          <div className="settings-policy-item"><span>Time format</span><strong>{systemSettings.timeFormat || preferences.timeFormat}</strong></div>
+          <div className="settings-policy-item"><span>Manager approval</span><strong>{systemSettings.employeeSettings?.requireManagerApproval === false ? 'Not required' : 'Required'}</strong></div>
+        </div>
+      </section>
+    </div>
   );
 };
 

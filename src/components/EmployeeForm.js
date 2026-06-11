@@ -4,7 +4,7 @@ import axios from 'axios';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'animate.css';
 
-const EmployeeForm = ({ employee, isEmployee }) => {
+const EmployeeForm = ({ employee, isEmployee, mode = 'add' }) => {
   const [formData, setFormData] = useState({
     name: employee ? employee.name : '',
     email: employee ? employee.email : '',
@@ -22,9 +22,12 @@ const EmployeeForm = ({ employee, isEmployee }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(employee ? employee.profilePhoto : '');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const isEditMode = mode === 'edit';
 
   const fetchEmployees = async () => {
     if (isEmployee) return; // Employees don't fetch employee list
@@ -79,6 +82,9 @@ const EmployeeForm = ({ employee, isEmployee }) => {
       setError('Employees cannot add new employees');
       return;
     }
+    setError('');
+    setSuccess('');
+    setIsSubmitting(true);
     try {
       const res = await axios.post(
         `${process.env.REACT_APP_API_URL}/employees`,
@@ -103,15 +109,17 @@ const EmployeeForm = ({ employee, isEmployee }) => {
         );
       }
 
-      setFormData({ name: '', email: '', phone: '', position: '', department: '', bankAccount: '', bankName: '', salary: '', joiningDate: '', password: '', profilePhoto: '' });
+      setFormData({ name: '', email: '', phone: '', address: '', position: '', department: '', bankAccount: '', bankName: '', salary: '', joiningDate: '', password: '', profilePhoto: '' });
       setSelectedFile(null);
       setPhotoPreview('');
       fetchEmployees();
       setError('');
-      alert('Employee added successfully');
+      setSuccess('Employee added successfully. Login details have been created for the employee.');
     } catch (err) {
       console.error('Add employee error:', err);
       setError(err.response?.data?.message || 'Error adding employee');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -206,6 +214,8 @@ const EmployeeForm = ({ employee, isEmployee }) => {
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    setError('');
+    setSuccess('');
   };
 
   const handleFileChange = (e) => {
@@ -234,6 +244,264 @@ const EmployeeForm = ({ employee, isEmployee }) => {
             border-radius: 1rem;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
             margin: 1rem;
+          }
+          .admin-employee-form {
+            color: #0f172a;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+          }
+          .admin-form-hero,
+          .admin-form-panel,
+          .admin-form-list {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.85rem;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
+          }
+          .admin-form-hero {
+            background:
+              radial-gradient(circle at 92% 8%, rgba(14, 165, 233, 0.14), transparent 30%),
+              linear-gradient(135deg, #ffffff 0%, #f8fbff 55%, #eef7ff 100%);
+            border-color: #dbeafe;
+            padding: 1.35rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+          }
+          .admin-form-eyebrow,
+          .admin-section-eyebrow,
+          .admin-preview-label {
+            margin: 0;
+            color: #64748b;
+            font-size: 0.76rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+          }
+          .admin-form-title {
+            margin: 0.2rem 0 0;
+            color: #0f172a;
+            font-size: clamp(1.45rem, 3vw, 2.1rem);
+            font-weight: 850;
+            line-height: 1.15;
+          }
+          .admin-form-subtitle {
+            margin: 0.45rem 0 0;
+            color: #64748b;
+            font-size: 0.95rem;
+          }
+          .admin-form-count {
+            border: 1px solid #bfdbfe;
+            border-radius: 999px;
+            background: #ffffff;
+            color: #1d4ed8;
+            padding: 0.48rem 0.75rem;
+            font-size: 0.85rem;
+            font-weight: 800;
+            white-space: nowrap;
+          }
+          .admin-form-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 320px;
+            gap: 1rem;
+            align-items: start;
+          }
+          .admin-form-panel,
+          .admin-form-list {
+            padding: 1.1rem;
+          }
+          .admin-form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1rem;
+          }
+          .admin-form-field-full {
+            grid-column: 1 / -1;
+          }
+          .admin-section-title {
+            margin: 0.2rem 0 1rem;
+            color: #0f172a;
+            font-size: 1.05rem;
+            font-weight: 800;
+          }
+          .admin-employee-form .form-group,
+          .admin-employee-form .mb-3 {
+            margin-bottom: 0 !important;
+          }
+          .admin-employee-form .form-label {
+            color: #334155;
+            font-size: 0.86rem;
+            font-weight: 800;
+            gap: 0.45rem;
+          }
+          .admin-employee-form .form-label svg {
+            width: 18px;
+            height: 18px;
+            color: #2563eb;
+          }
+          .admin-employee-form .form-control {
+            border: 1px solid #cbd5e1;
+            border-radius: 0.65rem;
+            background: #ffffff;
+            color: #0f172a;
+            min-height: 44px;
+            box-shadow: none;
+          }
+          .admin-employee-form .form-control:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+          }
+          .admin-form-preview {
+            position: sticky;
+            top: 6rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+          }
+          .admin-preview-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.85rem;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
+            padding: 1.1rem;
+          }
+          .admin-preview-photo {
+            width: 96px;
+            height: 96px;
+            border-radius: 24px;
+            background: linear-gradient(135deg, #2563eb, #14b8a6);
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: 900;
+            overflow: hidden;
+            box-shadow: 0 14px 28px rgba(37, 99, 235, 0.2);
+          }
+          .admin-preview-photo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+          }
+          .admin-preview-name {
+            margin: 0.9rem 0 0.2rem;
+            color: #0f172a;
+            font-size: 1.15rem;
+            font-weight: 850;
+            word-break: break-word;
+          }
+          .admin-preview-muted {
+            margin: 0;
+            color: #64748b;
+            font-size: 0.86rem;
+            word-break: break-word;
+          }
+          .admin-preview-stack {
+            display: grid;
+            gap: 0.65rem;
+            margin-top: 1rem;
+          }
+          .admin-preview-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding: 0.7rem;
+            border-radius: 0.65rem;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            color: #334155;
+            font-size: 0.86rem;
+          }
+          .admin-preview-row strong {
+            color: #0f172a;
+            text-align: right;
+            word-break: break-word;
+          }
+          .admin-submit-row {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            margin-top: 1rem;
+          }
+          .admin-submit-btn {
+            border: 1px solid #2563eb !important;
+            background: #2563eb !important;
+            color: #ffffff !important;
+            border-radius: 0.7rem !important;
+            padding: 0.72rem 1rem !important;
+            font-size: 0.95rem !important;
+            box-shadow: 0 10px 22px rgba(37, 99, 235, 0.2) !important;
+          }
+          .admin-submit-btn:hover {
+            background: #1d4ed8 !important;
+            transform: translateY(-1px) !important;
+          }
+          .admin-form-list-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1rem;
+          }
+          .admin-form-table {
+            margin: 0;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.75rem;
+            overflow: hidden;
+          }
+          .admin-form-table thead {
+            background: #f8fafc;
+            color: #475569;
+          }
+          .admin-form-table thead th {
+            font-size: 0.76rem;
+            letter-spacing: 0.06em;
+            border-bottom: 1px solid #e2e8f0;
+          }
+          .admin-form-table th,
+          .admin-form-table td {
+            padding: 0.9rem;
+            border-color: #e2e8f0;
+            color: #334155;
+          }
+          .admin-form-table tbody tr:hover {
+            background: #f8fafc;
+            transform: none;
+          }
+          .admin-action-light,
+          .admin-action-danger {
+            border-radius: 0.6rem !important;
+            padding: 0.45rem 0.7rem !important;
+            font-size: 0.82rem !important;
+            font-weight: 800 !important;
+            box-shadow: none !important;
+          }
+          .admin-action-light {
+            border: 1px solid #bfdbfe !important;
+            background: #eff6ff !important;
+            color: #1d4ed8 !important;
+          }
+          .admin-action-danger {
+            border: 1px solid #fecaca !important;
+            background: #fef2f2 !important;
+            color: #b91c1c !important;
+          }
+          .admin-form-empty {
+            min-height: 120px;
+            border: 1px dashed #cbd5e1;
+            border-radius: 0.75rem;
+            background: #f8fafc;
+            color: #64748b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 1rem;
+            font-weight: 700;
           }
           .form-title, .table-title {
             font-size: 2rem;
@@ -428,6 +696,24 @@ const EmployeeForm = ({ employee, isEmployee }) => {
             .employee-form-container {
               padding: 1rem;
               margin: 0.5rem;
+            }
+            .admin-form-hero,
+            .admin-form-list-header {
+              align-items: flex-start;
+              flex-direction: column;
+            }
+            .admin-form-layout,
+            .admin-form-grid {
+              grid-template-columns: 1fr;
+            }
+            .admin-form-preview {
+              position: static;
+            }
+            .admin-submit-row {
+              justify-content: stretch;
+            }
+            .admin-submit-btn {
+              width: 100%;
             }
             .form-title, .table-title {
               font-size: 1.6rem;
@@ -700,14 +986,35 @@ const EmployeeForm = ({ employee, isEmployee }) => {
             </Form>
           </>
         ) : (
-          <>
-            <h3 className="form-title animate__animated animate__zoomIn">Add Employee</h3>
+          <div className="admin-employee-form">
+            <section className="admin-form-hero">
+              <div>
+                <p className="admin-form-eyebrow">{isEditMode ? 'Employee records' : 'Employee onboarding'}</p>
+                <h3 className="admin-form-title">{isEditMode ? 'Edit Employee' : 'Add Employee'}</h3>
+                <p className="admin-form-subtitle">
+                  {isEditMode
+                    ? 'Select an employee, update their profile, payroll, bank details, or profile photo.'
+                    : 'Create employee profile, login access, payroll details, and optional profile photo.'}
+                </p>
+              </div>
+              <span className="admin-form-count">{employees.length} employees</span>
+            </section>
             {error && (
               <Alert variant="danger" className="animate__animated animate__fadeIn">
                 {error}
               </Alert>
             )}
-            <Form onSubmit={handleSubmit}>
+            {success && (
+              <Alert variant="success" className="animate__animated animate__fadeIn">
+                {success}
+              </Alert>
+            )}
+            {!isEditMode && (
+            <section className="admin-form-layout">
+              <Form onSubmit={handleSubmit} className="admin-form-panel">
+                <p className="admin-section-eyebrow">Profile and payroll</p>
+                <h4 className="admin-section-title">Employee details</h4>
+                <div className="admin-form-grid">
               <Form.Group controlId="name" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.1s' }}>
                 <Form.Label>
                   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -850,7 +1157,7 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  Monthly Salary (₹)
+                  Monthly Salary (Rs.)
                 </Form.Label>
                 <Form.Control
                   type="number"
@@ -889,56 +1196,57 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                   accept="image/*"
                   onChange={handleFileChange}
                 />
-                <div className="mt-2">
-                  {photoPreview ? (
-                    <img
-                      src={photoPreview}
-                      alt="Preview"
-                      style={{
-                        width: '80px',
-                        height: '80px',
-                        borderRadius: '50%',
-                        objectFit: 'cover',
-                        border: '2px solid #1e40af'
-                      }}
-                    />
-                  ) : (
-                    <div
-                      style={{
-                        width: '80px',
-                        height: '80px',
-                        borderRadius: '50%',
-                        background: '#bfdbfe',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '2rem',
-                        fontWeight: 'bold',
-                        color: '#1e40af',
-                        border: '2px solid #1e40af'
-                      }}
-                    >
-                      {(selectedEmployee?.name || 'U')[0].toUpperCase()}
-                    </div>
-                  )}
-                </div>
               </Form.Group>
+                </div>
+                <div className="admin-submit-row">
               <Button
                 variant="primary"
                 type="submit"
-                className="animate__animated animate__fadeIn"
+                className="admin-submit-btn animate__animated animate__fadeIn"
                 style={{ animationDelay: '0.7s' }}
+                disabled={isSubmitting}
               >
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
                 </svg>
-                Add Employee
+                {isSubmitting ? 'Adding Employee...' : 'Add Employee'}
               </Button>
-            </Form>
+                </div>
+              </Form>
 
-            <h3 className="table-title mt-5 animate__animated animate__zoomIn">Employee List</h3>
-            <div className="table-responsive">
-              <Table className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.8s' }}>
+              <aside className="admin-form-preview">
+                <div className="admin-preview-card">
+                  <p className="admin-preview-label">Live preview</p>
+                  <div className="admin-preview-photo">
+                    {photoPreview ? (
+                      <img src={photoPreview} alt="Employee preview" />
+                    ) : (
+                      <span>{(formData.name || 'E')[0].toUpperCase()}</span>
+                    )}
+                  </div>
+                  <h4 className="admin-preview-name">{formData.name || 'Employee name'}</h4>
+                  <p className="admin-preview-muted">{formData.position || 'Position'}{formData.department ? `, ${formData.department}` : ''}</p>
+                  <div className="admin-preview-stack">
+                    <div className="admin-preview-row"><span>Email</span><strong>{formData.email || 'Not set'}</strong></div>
+                    <div className="admin-preview-row"><span>Phone</span><strong>{formData.phone || 'Not set'}</strong></div>
+                    <div className="admin-preview-row"><span>Joining</span><strong>{formData.joiningDate || 'Not set'}</strong></div>
+                    <div className="admin-preview-row"><span>Salary</span><strong>{formData.salary ? `Rs. ${Number(formData.salary).toLocaleString('en-IN')}` : 'Optional'}</strong></div>
+                  </div>
+                </div>
+              </aside>
+            </section>
+            )}
+
+            <section className="admin-form-list">
+              <div className="admin-form-list-header">
+                <div>
+                  <p className="admin-section-eyebrow">Directory</p>
+                  <h4 className="admin-section-title mb-0">{isEditMode ? 'Choose employee to edit' : 'Recently added employees'}</h4>
+                </div>
+                <span className="admin-form-count">{employees.length} records</span>
+              </div>
+              <div className="table-responsive">
+              <Table className="admin-form-table animate__animated animate__fadeInUp" style={{ animationDelay: '0.8s' }}>
                 <thead>
                   <tr>
                     <th>Employee ID</th>
@@ -946,7 +1254,7 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                     <th>Email</th>
                     <th>Phone</th>
                     <th>Position</th>
-                    <th>Salary (₹)</th>
+                    <th>Salary (Rs.)</th>
                     <th>Paid Leaves</th>
                     <th>Unpaid Leaves</th>
                     <th>Action</th>
@@ -961,14 +1269,14 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                         <td>{emp.email}</td>
                         <td>{emp.phone}</td>
                         <td>{emp.position}</td>
-                        <td>{emp.salary && typeof emp.salary === 'number' && !isNaN(emp.salary) ? `₹${emp.salary.toFixed(2)}` : 'N/A'}</td>
+                        <td>{emp.salary && typeof emp.salary === 'number' && !isNaN(emp.salary) ? `Rs. ${emp.salary.toFixed(2)}` : 'N/A'}</td>
                         <td>{emp.paidLeaveBalance || 0}</td>
                         <td>{emp.unpaidLeaveBalance || 6}</td>
                         <td>
                           <Button
                             variant="warning"
                             size="sm"
-                            className="me-2"
+                            className="admin-action-light me-2"
                             onClick={() => handleEdit(emp)}
                           >
                             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -979,6 +1287,7 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                           <Button
                             variant="danger"
                             size="sm"
+                            className="admin-action-danger"
                             onClick={() => handleDelete(emp._id)}
                           >
                             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -991,13 +1300,14 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="9" className="table-empty">No employees available</td>
+                      <td colSpan="9"><div className="admin-form-empty">No employees available</div></td>
                     </tr>
                   )}
                 </tbody>
               </Table>
-            </div>
-          </>
+              </div>
+            </section>
+          </div>
         )}
 
         <Modal show={showEditModal} onHide={() => setShowEditModal(false)} className="animate__animated animate__fadeIn">
@@ -1148,7 +1458,7 @@ const EmployeeForm = ({ employee, isEmployee }) => {
                   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  Monthly Salary (₹)
+                  Monthly Salary (Rs.)
                 </Form.Label>
                 <Form.Control
                   type="number"
