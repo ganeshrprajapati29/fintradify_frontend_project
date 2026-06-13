@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Navbar, Nav, Button, Container, Card, Offcanvas, Alert } from 'react-bootstrap';
+import { Navbar, Nav, Button, Container, Card, Offcanvas, Alert, Modal, Form, Spinner } from 'react-bootstrap';
 import { useHistory } from 'react-router-dom';
 import axios from 'axios';
 import { Line } from 'react-chartjs-2';
@@ -52,6 +52,11 @@ const EmployeeDashboard = () => {
   const [dashboardReimbursements, setDashboardReimbursements] = useState([]);
   const [leaveBalances, setLeaveBalances] = useState(null);
   const [error, setError] = useState('');
+  const [taskMessage, setTaskMessage] = useState('');
+  const [quickTask, setQuickTask] = useState(null);
+  const [quickTaskNote, setQuickTaskNote] = useState('');
+  const [quickTaskLoading, setQuickTaskLoading] = useState(false);
+  const [quickUpdatingTaskId, setQuickUpdatingTaskId] = useState('');
   const history = useHistory();
   const authHeaders = { Authorization: `Bearer ${localStorage.getItem('token')}` };
   const lastLocationSentRef = useRef({ at: 0, latitude: null, longitude: null });
@@ -250,6 +255,71 @@ const EmployeeDashboard = () => {
   const recentTasks = [...dashboardTasks]
     .sort((a, b) => new Date(a.dueDate || a.createdAt || 0) - new Date(b.dueDate || b.createdAt || 0))
     .slice(0, 5);
+
+  const updateDashboardTask = (taskId, payload) => {
+    setDashboardTasks((currentTasks) => currentTasks.map((task) => (
+      task._id === taskId ? { ...task, ...payload } : task
+    )));
+  };
+
+  const handleQuickStartTask = async (taskId) => {
+    setQuickUpdatingTaskId(taskId);
+    setTaskMessage('');
+    try {
+      const res = await axios.put(
+        `${process.env.REACT_APP_API_URL}/tasks/${taskId}`,
+        { status: 'in-progress' },
+        { headers: authHeaders }
+      );
+      updateDashboardTask(taskId, res.data?.data || { status: 'in-progress' });
+      setError('');
+      setTaskMessage('Task moved to in progress.');
+    } catch (err) {
+      setTaskMessage('');
+      setError(err.response?.data?.message || 'Failed to start task');
+    } finally {
+      setQuickUpdatingTaskId('');
+    }
+  };
+
+  const openQuickSubmitTask = (task) => {
+    setQuickTask(task);
+    setQuickTaskNote(task.submissionNote || '');
+    setTaskMessage('');
+    setError('');
+  };
+
+  const closeQuickSubmitTask = () => {
+    if (quickTaskLoading) return;
+    setQuickTask(null);
+    setQuickTaskNote('');
+  };
+
+  const handleQuickSubmitTask = async () => {
+    if (!quickTask?._id) return;
+    setQuickTaskLoading(true);
+    try {
+      const res = await axios.put(
+        `${process.env.REACT_APP_API_URL}/tasks/${quickTask._id}`,
+        { status: 'completed', submissionNote: quickTaskNote },
+        { headers: authHeaders }
+      );
+      updateDashboardTask(quickTask._id, res.data?.data || {
+        status: 'completed',
+        submissionNote: quickTaskNote,
+        submittedAt: new Date().toISOString(),
+      });
+      setQuickTask(null);
+      setQuickTaskNote('');
+      setError('');
+      setTaskMessage('Task submitted successfully.');
+    } catch (err) {
+      setTaskMessage('');
+      setError(err.response?.data?.message || 'Failed to submit task');
+    } finally {
+      setQuickTaskLoading(false);
+    }
+  };
 
   const chartOptions = {
     responsive: true,
@@ -1160,6 +1230,35 @@ const EmployeeDashboard = () => {
             color: #64748b;
             font-size: 0.85rem;
           }
+          .employee-task-side {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+          }
+          .employee-task-submit {
+            border: 0;
+            border-radius: 999px;
+            background: #0f766e;
+            color: #ffffff;
+            font-size: 0.75rem;
+            font-weight: 800;
+            padding: 0.36rem 0.72rem;
+            line-height: 1;
+          }
+          .employee-task-submit:hover,
+          .employee-task-submit:focus {
+            background: #115e59;
+            color: #ffffff;
+          }
+          .employee-task-start {
+            background: #2563eb;
+          }
+          .employee-task-start:hover,
+          .employee-task-start:focus {
+            background: #1d4ed8;
+          }
           .employee-status {
             border-radius: 999px;
             padding: 0.35rem 0.65rem;
@@ -1382,6 +1481,9 @@ const EmployeeDashboard = () => {
             }
             .employee-task-row {
               grid-template-columns: 1fr;
+            }
+            .employee-task-side {
+              justify-content: flex-start;
             }
             .employee-topbar-actions {
               gap: 0.45rem;
@@ -1617,6 +1719,15 @@ const EmployeeDashboard = () => {
                 {error}
               </Alert>
             )}
+            {taskMessage && (
+              <Alert
+                variant="success"
+                className="mb-4 animate__animated animate__fadeIn"
+                role="status"
+              >
+                {taskMessage}
+              </Alert>
+            )}
             {activeTab === 'profile' && (
               <div className="employee-dashboard-modern animate__animated animate__fadeInUp">
                 <section className="employee-hero-card">
@@ -1728,17 +1839,43 @@ const EmployeeDashboard = () => {
                     </div>
                     {recentTasks.length ? (
                       <div className="employee-task-list">
-                        {recentTasks.map((task) => (
-                          <div className="employee-task-row" key={task._id || task.id || task.title}>
-                            <div>
-                              <p className="employee-task-title">{task.title || task.taskName || 'Untitled task'}</p>
-                              <p className="employee-task-meta">
-                                Due {task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-IN') : 'N/A'}
-                              </p>
+                        {recentTasks.map((task) => {
+                          const taskStatus = getStatus(task.status);
+                          const isUpdating = quickUpdatingTaskId === task._id;
+                          return (
+                            <div className="employee-task-row" key={task._id || task.id || task.title}>
+                              <div>
+                                <p className="employee-task-title">{task.title || task.taskName || 'Untitled task'}</p>
+                                <p className="employee-task-meta">
+                                  Due {task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-IN') : 'N/A'}
+                                  {task.submittedAt ? ` | Submitted ${new Date(task.submittedAt).toLocaleDateString('en-IN')}` : ''}
+                                </p>
+                              </div>
+                              <div className="employee-task-side">
+                                <span className={`employee-status ${taskStatus}`}>{task.status || 'Pending'}</span>
+                                {taskStatus === 'pending' && (
+                                  <button
+                                    type="button"
+                                    className="employee-task-submit employee-task-start"
+                                    onClick={() => handleQuickStartTask(task._id)}
+                                    disabled={isUpdating}
+                                  >
+                                    {isUpdating ? 'Starting...' : 'Start'}
+                                  </button>
+                                )}
+                                {taskStatus === 'in-progress' && (
+                                  <button
+                                    type="button"
+                                    className="employee-task-submit"
+                                    onClick={() => openQuickSubmitTask(task)}
+                                  >
+                                    Submit
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                            <span className={`employee-status ${getStatus(task.status)}`}>{task.status || 'Pending'}</span>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     ) : (
                       <div className="employee-empty-state">No assigned tasks found.</div>
@@ -1870,6 +2007,31 @@ const EmployeeDashboard = () => {
                 © {new Date().getFullYear()} Fintradify. All rights reserved.
               </p>
             </div>
+            <Modal show={Boolean(quickTask)} onHide={closeQuickSubmitTask} centered>
+              <Modal.Header closeButton>
+                <Modal.Title>Submit Task</Modal.Title>
+              </Modal.Header>
+              <Modal.Body>
+                <p className="mb-2 fw-bold">{quickTask?.title || 'Task'}</p>
+                <p className="text-muted mb-3">Add a short completion note before submitting this task.</p>
+                <Form.Group>
+                  <Form.Label>Submission note</Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={4}
+                    value={quickTaskNote}
+                    onChange={(event) => setQuickTaskNote(event.target.value)}
+                    placeholder="Write completion details, links, remarks, or handover notes..."
+                  />
+                </Form.Group>
+              </Modal.Body>
+              <Modal.Footer>
+                <Button variant="outline-secondary" onClick={closeQuickSubmitTask} disabled={quickTaskLoading}>Cancel</Button>
+                <Button variant="success" onClick={handleQuickSubmitTask} disabled={quickTaskLoading}>
+                  {quickTaskLoading ? <><Spinner animation="border" size="sm" className="me-2" />Submitting...</> : 'Submit Task'}
+                </Button>
+              </Modal.Footer>
+            </Modal>
           </Container>
         </div>
       </div>
