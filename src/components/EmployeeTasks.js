@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Badge, Button, Spinner } from 'react-bootstrap';
+import { Alert, Badge, Button, Form, Modal, Spinner } from 'react-bootstrap';
 import moment from 'moment';
 import api from '../utils/axios';
 import PaginationControls from './PaginationControls';
@@ -27,6 +27,10 @@ const EmployeeTasks = () => {
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
+  const [updatingTaskId, setUpdatingTaskId] = useState('');
+  const [submitTask, setSubmitTask] = useState(null);
+  const [submitNote, setSubmitNote] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const paginatedTasks = tasks.slice((page - 1) * limit, page * limit);
 
@@ -59,16 +63,57 @@ const EmployeeTasks = () => {
   const completionRate = tasks.length ? Math.round(((summary.completed || 0) / tasks.length) * 100) : 0;
 
   const handleStatusUpdate = async (taskId, status) => {
+    setUpdatingTaskId(taskId);
     try {
-      await api.put(`/tasks/${taskId}`, { status });
+      const res = await api.put(`/tasks/${taskId}`, { status });
+      const updatedTask = res.data?.data;
       setMessage(status === 'completed' ? 'Task marked as completed' : 'Task moved to in progress');
       setError('');
       setTasks((currentTasks) => currentTasks.map((task) => (
-        task._id === taskId ? { ...task, status } : task
+        task._id === taskId ? { ...task, ...(updatedTask || {}), status } : task
       )));
     } catch (err) {
       setMessage('');
       setError(err.response?.data?.message || 'Failed to update task status');
+    } finally {
+      setUpdatingTaskId('');
+    }
+  };
+
+  const openSubmitModal = (task) => {
+    setSubmitTask(task);
+    setSubmitNote(task.submissionNote || '');
+    setError('');
+    setMessage('');
+  };
+
+  const closeSubmitModal = () => {
+    if (submitting) return;
+    setSubmitTask(null);
+    setSubmitNote('');
+  };
+
+  const handleSubmitTask = async () => {
+    if (!submitTask?._id) return;
+    setSubmitting(true);
+    try {
+      const res = await api.put(`/tasks/${submitTask._id}`, {
+        status: 'completed',
+        submissionNote: submitNote,
+      });
+      const updatedTask = res.data?.data;
+      setTasks((currentTasks) => currentTasks.map((task) => (
+        task._id === submitTask._id ? { ...task, ...(updatedTask || {}), status: 'completed' } : task
+      )));
+      setMessage('Task submitted successfully');
+      setError('');
+      setSubmitTask(null);
+      setSubmitNote('');
+    } catch (err) {
+      setMessage('');
+      setError(err.response?.data?.message || 'Failed to submit task');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -223,6 +268,24 @@ const EmployeeTasks = () => {
             border-radius: 0.65rem;
             font-weight: 800;
           }
+          .task-submit-note {
+            margin-top: 0.8rem;
+            padding: 0.75rem;
+            border: 1px solid #bbf7d0;
+            border-radius: 0.75rem;
+            background: #f0fdf4;
+            color: #166534;
+            font-weight: 700;
+            line-height: 1.5;
+          }
+          .task-submit-note span {
+            display: block;
+            color: #64748b;
+            font-size: 0.76rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            margin-bottom: 0.25rem;
+          }
           .task-empty {
             min-height: 220px;
             display: flex;
@@ -296,6 +359,7 @@ const EmployeeTasks = () => {
             {paginatedTasks.map((task) => {
               const statusMeta = getStatusMeta(task.status);
               const priorityMeta = getPriorityMeta(task.priority);
+              const isUpdating = updatingTaskId === task._id;
               return (
                 <article className="task-card" key={task._id}>
                   <div>
@@ -305,17 +369,24 @@ const EmployeeTasks = () => {
                       <Badge bg={statusMeta.variant}>{statusMeta.label}</Badge>
                       <span className={`task-pill task-priority ${priorityMeta.className}`}>{priorityMeta.label} priority</span>
                       <span className="task-pill">Due {task.dueDate ? moment(task.dueDate).format('DD MMM YYYY') : 'N/A'}</span>
+                      {task.submittedAt && <span className="task-pill">Submitted {moment(task.submittedAt).format('DD MMM YYYY, hh:mm A')}</span>}
                     </div>
+                    {task.submissionNote && (
+                      <div className="task-submit-note">
+                        <span>Submission note</span>
+                        {task.submissionNote}
+                      </div>
+                    )}
                   </div>
                   <div className="task-actions">
                     {task.status === 'pending' && (
-                      <Button className="task-action-btn" variant="primary" onClick={() => handleStatusUpdate(task._id, 'in-progress')}>
-                        Start Task
+                      <Button className="task-action-btn" variant="primary" disabled={isUpdating} onClick={() => handleStatusUpdate(task._id, 'in-progress')}>
+                        {isUpdating ? <Spinner animation="border" size="sm" /> : 'Start Task'}
                       </Button>
                     )}
                     {task.status === 'in-progress' && (
-                      <Button className="task-action-btn" variant="success" onClick={() => handleStatusUpdate(task._id, 'completed')}>
-                        Complete
+                      <Button className="task-action-btn" variant="success" onClick={() => openSubmitModal(task)}>
+                        Submit Task
                       </Button>
                     )}
                     {task.status === 'completed' && (
@@ -346,6 +417,32 @@ const EmployeeTasks = () => {
           />
         )}
       </section>
+
+      <Modal show={Boolean(submitTask)} onHide={closeSubmitModal} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Submit Task</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="mb-2 fw-bold">{submitTask?.title || 'Task'}</p>
+          <p className="text-muted mb-3">Add a short completion note before submitting this task.</p>
+          <Form.Group>
+            <Form.Label>Submission note</Form.Label>
+            <Form.Control
+              as="textarea"
+              rows={4}
+              value={submitNote}
+              onChange={(event) => setSubmitNote(event.target.value)}
+              placeholder="Write what you completed, links, remarks, or handover details..."
+            />
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="outline-secondary" onClick={closeSubmitModal} disabled={submitting}>Cancel</Button>
+          <Button variant="success" onClick={handleSubmitTask} disabled={submitting}>
+            {submitting ? <><Spinner animation="border" size="sm" className="me-2" />Submitting...</> : 'Submit Task'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 };
