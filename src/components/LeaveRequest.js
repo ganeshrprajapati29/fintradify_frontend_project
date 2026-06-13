@@ -22,7 +22,7 @@ const getLeaveDays = (startDate, endDate) => {
 
 const LeaveRequest = ({ isAdmin }) => {
   const [leaves, setLeaves] = useState([]);
-  const [formData, setFormData] = useState({ startDate: '', endDate: '', reason: '' });
+  const [formData, setFormData] = useState({ startDate: '', endDate: '', reason: '', type: 'paid' });
   const [leaveBalances, setLeaveBalances] = useState({ paidLeaveBalance: 0, unpaidLeaveBalance: 0, halfDayLeaveBalance: 0 });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -107,8 +107,13 @@ const LeaveRequest = ({ isAdmin }) => {
       return;
     }
 
-    if (requestedDays > Number(leaveBalances.paidLeaveBalance || 0)) {
-      setError(`Insufficient paid leave balance. Available: ${leaveBalances.paidLeaveBalance}, requested: ${requestedDays}.`);
+    const selectedBalance = formData.type === 'unpaid'
+      ? Number(leaveBalances.unpaidLeaveBalance || 0)
+      : Number(leaveBalances.paidLeaveBalance || 0);
+    const selectedLabel = formData.type === 'unpaid' ? 'unpaid' : 'paid';
+
+    if (requestedDays > selectedBalance) {
+      setError(`Insufficient ${selectedLabel} leave balance. Available: ${selectedBalance}, requested: ${requestedDays}.`);
       return;
     }
 
@@ -117,7 +122,7 @@ const LeaveRequest = ({ isAdmin }) => {
       await api.post('/leaves', formData);
       setSuccess('Leave request submitted successfully');
       setError('');
-      setFormData({ startDate: '', endDate: '', reason: '' });
+      setFormData({ startDate: '', endDate: '', reason: '', type: 'paid' });
       await fetchLeaves();
       await fetchLeaveBalances();
     } catch (err) {
@@ -425,6 +430,7 @@ const LeaveRequest = ({ isAdmin }) => {
         <div className="leave-summary-card"><span>Approved</span><strong>{summary.approved || 0}</strong></div>
         <div className="leave-summary-card"><span>Rejected</span><strong>{summary.rejected || 0}</strong></div>
         <div className="leave-summary-card"><span>{isAdmin ? 'Total Days' : 'Paid Balance'}</span><strong>{isAdmin ? summary.days : leaveBalances.paidLeaveBalance}</strong></div>
+        {!isAdmin && <div className="leave-summary-card"><span>Unpaid Balance</span><strong>{leaveBalances.unpaidLeaveBalance}</strong></div>}
       </section>
 
       <section className={`leave-content-grid ${isAdmin ? 'admin-mode' : ''}`}>
@@ -457,6 +463,15 @@ const LeaveRequest = ({ isAdmin }) => {
                       required
                       min={formData.startDate || moment().format('YYYY-MM-DD')}
                     />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>Leave Type</Form.Label>
+                    <Form.Select name="type" value={formData.type} onChange={handleChange} required>
+                      <option value="paid">Paid Leave</option>
+                      <option value="unpaid">Unpaid Leave</option>
+                    </Form.Select>
                   </Form.Group>
                 </Col>
                 <Col xs={12}>
@@ -513,6 +528,7 @@ const LeaveRequest = ({ isAdmin }) => {
                     <tr>
                       {isAdmin && <th>Employee</th>}
                       <th>Date Range</th>
+                      <th>Type</th>
                       <th>Days</th>
                       <th>Reason</th>
                       <th>Status</th>
@@ -527,6 +543,7 @@ const LeaveRequest = ({ isAdmin }) => {
                           <tr key={leave._id}>
                             {isAdmin && <td>{leave.employee?.name || 'N/A'}<br /><span className="text-muted small">{leave.employee?.employeeId || 'N/A'}</span></td>}
                             <td>{moment(leave.startDate).format('DD MMM YYYY')} - {moment(leave.endDate).format('DD MMM YYYY')}</td>
+                            <td><Badge bg={(leave.type || 'paid') === 'unpaid' ? 'secondary' : 'primary'}>{(leave.type || 'paid').toUpperCase()}</Badge></td>
                             <td>{getLeaveDays(leave.startDate, leave.endDate)}</td>
                             <td className="leave-reason" title={leave.reason}>{leave.reason || '-'}</td>
                             <td><Badge bg={statusMeta.variant}>{statusMeta.label}</Badge></td>
@@ -545,7 +562,7 @@ const LeaveRequest = ({ isAdmin }) => {
                       })
                     ) : (
                       <tr>
-                        <td colSpan={isAdmin ? 6 : 4} className="text-center text-muted py-4">No leave requests available</td>
+                        <td colSpan={isAdmin ? 7 : 5} className="text-center text-muted py-4">No leave requests available</td>
                       </tr>
                     )}
                   </tbody>
@@ -566,6 +583,7 @@ const LeaveRequest = ({ isAdmin }) => {
                           <Badge bg={statusMeta.variant}>{statusMeta.label}</Badge>
                         </div>
                         <p className="leave-mobile-meta">{getLeaveDays(leave.startDate, leave.endDate)} days</p>
+                        <p className="leave-mobile-meta">Type: {(leave.type || 'paid').toUpperCase()}</p>
                         <p className="mb-0">{leave.reason || '-'}</p>
                         {isAdmin && (
                           <div className="d-flex gap-2 mt-3">

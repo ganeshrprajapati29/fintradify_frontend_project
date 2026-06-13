@@ -2,73 +2,126 @@
   position: sticky;
   top: 0;
   z-index: 1000;
-  background: rgba(255, 255, 255, 0.92);
-  border-bottom: 1px solid #e5e7eb;
-  backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.88);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.86);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.07);
+}
+
+.public-navbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(14, 116, 144, 0.45), transparent);
 }
 
 .public-navbar.is-dark {
-  background: rgba(15, 23, 42, 0.92);
+  background: rgba(15, 23, 42, 0.9);
   border-bottom-color: rgba(148, 163, 184, 0.22);
 }
 
 .public-navbar__inner {
-  width: min(1180px, calc(100% - 32px));
-  min-height: 72px;
+  width: min(1220px, calc(100% - 32px));
+  min-height: 78px;
   margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
+  position: relative;
 }
 
 .public-navbar__brand {
   display: inline-flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
   color: #0f172a;
-  font-size: 18px;
-  font-weight: 800;
   text-decoration: none;
 }
 
-.public-navbar.is-dark .public-navbar__brand {
-  color: #f8fafc;
-}
-
-.public-navbar__logo-mark,
-.public-navbar__logo-img {
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
-}
-
-.public-navbar__logo-mark {
+.public-navbar__logo-wrap {
+  width: 128px;
+  height: 50px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #1d4ed8;
-  color: #ffffff;
-  font-weight: 900;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid rgba(14, 116, 144, 0.16);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
 }
 
 .public-navbar__logo-img {
-  object-fit: cover;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 5px 8px;
+}
+
+.public-navbar__brand-copy {
+  display: grid;
+  gap: 2px;
+  line-height: 1.1;
+}
+
+.public-navbar__brand-copy strong {
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.public-navbar__brand-copy small {
+  color: #0e7490;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.public-navbar.is-dark .public-navbar__brand-copy strong {
+  color: #f8fafc;
+}
+
+.public-navbar.is-dark .public-navbar__brand-copy small {
+  color: #67e8f9;
 }
 
 .public-navbar__links {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.82);
+}
+
+.public-navbar.is-dark .public-navbar__links {
+  background: rgba(30, 41, 59, 0.72);
+  border-color: rgba(148, 163, 184, 0.25);
 }
 
 .public-navbar__links a {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
   color: #475569;
   text-decoration: none;
   font-size: 14px;
-  font-weight: 700;
-  padding: 10px 12px;
-  border-radius: 8px;
+  font-weight: 850;
+  line-height: 1;
+  padding: 0 13px;
+  border-radius: 7px;
+  white-space: nowrap;
+  transition: background 180ms ease, color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 }
 
 .public-navbar.is-dark .public-navbar__links a {
@@ -77,14 +130,25 @@
 
 .public-navbar__links a:hover,
 .public-navbar__links a.active {
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: #ffffff;
+  color: #0e7490;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.public-navbar__links a:hover {
+  transform: translateY(-1px);
 }
 
 .public-navbar__login {
-  margin-left: 8px;
-  background: #1d4ed8 !important;
+  gap: 8px;
+  margin-left: 6px;
+  background: linear-gradient(135deg, #0f766e 0%, #173b74 100%) !important;
   color: #ffffff !important;
+  box-shadow: 0 12px 24px rgba(15, 118, 110, 0.24) !important;
+}
+
+.public-navbar__login svg {
+  font-size: 11px;
 }
 
 .public-navbar__toggle,
@@ -92,52 +156,91 @@
   display: none;
 }
 
+@media (max-width: 980px) {
+  .public-navbar__brand-copy {
+    display: none;
+  }
+
+  .public-navbar__links a {
+    padding: 0 10px;
+  }
+}
+
 @media (max-width: 820px) {
   .public-navbar__inner {
-    min-height: 64px;
+    width: min(100% - 24px, 1220px);
+    min-height: 68px;
+  }
+
+  .public-navbar__logo-wrap {
+    width: 112px;
+    height: 44px;
   }
 
   .public-navbar__toggle-button {
     display: inline-flex;
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
     align-items: center;
     justify-content: center;
     border: 1px solid #dbe3ef;
     border-radius: 8px;
+    background: #ffffff;
     color: #0f172a;
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+    cursor: pointer;
   }
 
   .public-navbar.is-dark .public-navbar__toggle-button {
     color: #f8fafc;
+    background: #1e293b;
     border-color: rgba(148, 163, 184, 0.35);
   }
 
   .public-navbar__links {
     display: none;
     position: absolute;
-    top: 64px;
-    left: 16px;
-    right: 16px;
-    padding: 12px;
+    top: 62px;
+    left: 0;
+    right: 0;
+    padding: 10px;
     border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    background: #ffffff;
-    box-shadow: 0 18px 36px rgba(15, 23, 42, 0.16);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
   }
 
   .public-navbar.is-dark .public-navbar__links {
-    background: #0f172a;
+    background: rgba(15, 23, 42, 0.98);
     border-color: rgba(148, 163, 184, 0.3);
   }
 
   .public-navbar__links a {
-    display: block;
+    display: flex;
     width: 100%;
-    padding: 12px;
+    min-height: 46px;
+    justify-content: flex-start;
+    padding: 0 12px;
+  }
+
+  .public-navbar__login {
+    margin: 6px 0 0;
+    justify-content: center !important;
   }
 
   .public-navbar__toggle:checked ~ .public-navbar__links {
-    display: block;
+    display: grid;
+    gap: 4px;
+  }
+}
+
+@media (max-width: 420px) {
+  .public-navbar__logo-wrap {
+    width: 104px;
+    height: 42px;
+  }
+
+  .public-navbar__inner {
+    min-height: 64px;
   }
 }

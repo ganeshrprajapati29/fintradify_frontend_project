@@ -30,9 +30,12 @@ import Profile from './ProfileDisplay';
 import EmployeeProfileEdit from './EmployeeProfileEdit';
 import AttendanceCalendar from './AttendanceCalendar';
 import EmployeeSettings from './EmployeeSettings';
+import EmployeePasswordSettings from './EmployeePasswordSettings';
 import EmployeeTasks from './EmployeeTasks';
 import EmployeeReimbursement from './EmployeeReimbursement';
 import Notification from './Notification';
+import CertificateManager from './CertificateManager';
+import DocumentSubmission from './DocumentSubmission';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'animate.css';
 
@@ -311,10 +314,21 @@ const EmployeeDashboard = () => {
     { key: 'leaves', label: 'Leave Requests' },
     { key: 'tasks', label: 'My Tasks' },
     { key: 'salary', label: 'Salary Slips' },
+    { key: 'certificates', label: 'Certificates' },
+    { key: 'documents', label: 'Documents' },
     { key: 'reimbursements', label: 'Reimbursements' },
     { key: 'notifications', label: 'Notifications' },
     { key: 'settings', label: 'Settings' },
+    { key: 'change-password', label: 'Change Password' },
     { key: 'edit-profile', label: 'Edit Profile' },
+  ];
+
+  const navGroups = [
+    { title: 'Overview', items: ['profile'] },
+    { title: 'Attendance', items: ['attendance-calendar', 'attendance', 'leaves'] },
+    { title: 'Work', items: ['tasks', 'reimbursements'] },
+    { title: 'Documents', items: ['salary', 'certificates', 'documents'] },
+    { title: 'Account', items: ['notifications', 'settings', 'change-password', 'edit-profile'] },
   ];
 
   const activeNavItem = navItems.find((item) => item.key === activeTab) || navItems[0];
@@ -327,12 +341,50 @@ const EmployeeDashboard = () => {
       {tab === 'leaves' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5h6m-6 4h6m-7 4h8M5 4h14v16H5z" />}
       {tab === 'tasks' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5h11M9 12h11M9 19h11M4 5l1 1 2-2M4 12l1 1 2-2M4 19l1 1 2-2" />}
       {tab === 'salary' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-2.21 0-4 1.12-4 2.5S9.79 13 12 13s4 1.12 4 2.5S14.21 18 12 18m0-10V6m0 12v2M4 6h16v12H4z" />}
+      {tab === 'certificates' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4M7 3h10a2 2 0 012 2v14l-3-2-3 2-3-2-3 2V5a2 2 0 012-2z" />}
+      {tab === 'documents' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6M7 3h7l5 5v13a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z" />}
       {tab === 'reimbursements' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7h18v10H3zM7 11h.01M17 13a2 2 0 100-4 2 2 0 000 4z" />}
       {tab === 'notifications' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0a3 3 0 01-6 0" />}
       {tab === 'settings' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.3 4.3a1.7 1.7 0 013.4 0 1.7 1.7 0 002.6 1.1 1.7 1.7 0 012.4 2.4 1.7 1.7 0 001.1 2.6 1.7 1.7 0 010 3.4 1.7 1.7 0 00-1.1 2.6 1.7 1.7 0 01-2.4 2.4 1.7 1.7 0 00-2.6 1.1 1.7 1.7 0 01-3.4 0 1.7 1.7 0 00-2.6-1.1 1.7 1.7 0 01-2.4-2.4 1.7 1.7 0 00-1.1-2.6 1.7 1.7 0 010-3.4 1.7 1.7 0 001.1-2.6 1.7 1.7 0 012.4-2.4 1.7 1.7 0 002.6-1.1z" />}
       {tab === 'settings' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />}
+      {tab === 'change-password' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 11V8a4 4 0 10-8 0v3m8 0h2a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2v-6a2 2 0 012-2h8zm6 4l2 2 4-4" />}
       {tab === 'edit-profile' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 3l5 5L10 19H5v-5L16 3z" />}
     </svg>
+  );
+
+  const renderEmployeeGroupedNav = () => (
+    <Nav className="employee-sidebar-nav sidebar-grouped-nav">
+      {navGroups.map((group) => {
+        const isOpen = group.items.includes(activeTab);
+        return (
+          <details className="sidebar-group" key={group.title} open={isOpen}>
+            <summary className="sidebar-group-title">
+              <span>{group.title}</span>
+              <svg className="sidebar-group-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 9l6 6 6-6" />
+              </svg>
+            </summary>
+            <div className="sidebar-group-items">
+              {group.items.map((key) => {
+                const item = navItems.find((navItem) => navItem.key === key);
+                if (!item) return null;
+                return (
+                  <Nav.Link
+                    key={item.key}
+                    className={`animate__animated animate__fadeInLeft ${activeTab === item.key ? 'active' : ''}`}
+                    onClick={() => handleTabClick(item.key)}
+                    aria-current={activeTab === item.key ? 'page' : undefined}
+                  >
+                    {renderNavIcon(item.key)}
+                    <span>{item.label}</span>
+                  </Nav.Link>
+                );
+              })}
+            </div>
+          </details>
+        );
+      })}
+    </Nav>
   );
 
   return (
@@ -462,6 +514,56 @@ const EmployeeDashboard = () => {
             overflow-y: auto;
             padding-right: 0.2rem;
           }
+          .employee-sidebar-nav:not(.sidebar-grouped-nav) {
+            display: flex;
+          }
+          .sidebar-grouped-nav {
+            display: none;
+          }
+          .sidebar-group {
+            border: 1px solid #e2e8f0;
+            border-radius: 0.85rem;
+            background: #ffffff;
+            overflow: hidden;
+          }
+          .sidebar-group[open] {
+            background: #f8fafc;
+            border-color: #bfdbfe;
+          }
+          .sidebar-group-title {
+            list-style: none;
+            cursor: pointer;
+            min-height: 42px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding: 0.68rem 0.75rem;
+            color: #0f172a;
+            font-size: 0.76rem;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+          }
+          .sidebar-group-title::-webkit-details-marker {
+            display: none;
+          }
+          .sidebar-group-chevron {
+            width: 16px;
+            height: 16px;
+            color: #64748b;
+            transition: transform 0.2s ease;
+            flex: 0 0 auto;
+          }
+          .sidebar-group[open] .sidebar-group-chevron {
+            transform: rotate(180deg);
+          }
+          .sidebar-group-items {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+            padding: 0 0.45rem 0.45rem;
+          }
           .employee-sidebar-nav::-webkit-scrollbar {
             width: 6px;
           }
@@ -471,19 +573,20 @@ const EmployeeDashboard = () => {
           }
           .nav-link {
             color: #475569 !important;
-            padding: 0.72rem 0.75rem;
-            border-radius: 0.75rem;
+            padding: 0.52rem 0.62rem;
+            border-radius: 0.62rem;
             margin: 0;
-            font-size: 0.95rem;
+            font-size: 0.84rem;
             font-weight: 700;
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: 0.55rem;
             transition: all 0.2s ease;
             position: relative;
             overflow: hidden;
-            min-height: 46px;
+            min-height: 34px;
             border: 1px solid transparent;
+            white-space: nowrap;
           }
           .nav-link:hover {
             background: #f1f5f9;
@@ -503,15 +606,15 @@ const EmployeeDashboard = () => {
             position: absolute;
             right: 0.45rem;
             width: 6px;
-            height: 24px;
+            height: 18px;
             border-radius: 999px;
             background: #2563eb;
           }
           .employee-nav-icon {
-            width: 20px;
-            height: 20px;
+            width: 16px;
+            height: 16px;
             flex-shrink: 0;
-            padding: 0.45rem;
+            padding: 0.32rem;
             box-sizing: content-box;
             border-radius: 0.65rem;
             color: #1d4ed8;
@@ -1361,6 +1464,7 @@ const EmployeeDashboard = () => {
               <span>{profile.position || profile.employeeId || 'Team member'}</span>
             </div>
           </div>
+          {renderEmployeeGroupedNav()}
           <Nav className="employee-sidebar-nav">
             {navItems.map((item) => (
               <Nav.Link
@@ -1470,6 +1574,7 @@ const EmployeeDashboard = () => {
                   <span>{profile.position || profile.employeeId || 'Team member'}</span>
                 </div>
               </div>
+              {renderEmployeeGroupedNav()}
               <Nav className="employee-sidebar-nav">
                 {navItems.map((item) => (
                   <Nav.Link
@@ -1538,6 +1643,8 @@ const EmployeeDashboard = () => {
                     <button type="button" className="employee-action-btn" onClick={() => handleTabClick('leaves')}>Apply Leave</button>
                     <button type="button" className="employee-action-btn" onClick={() => handleTabClick('tasks')}>My Tasks</button>
                     <button type="button" className="employee-action-btn" onClick={() => handleTabClick('salary')}>Salary Slips</button>
+                    <button type="button" className="employee-action-btn" onClick={() => handleTabClick('certificates')}>Certificates</button>
+                    <button type="button" className="employee-action-btn" onClick={() => handleTabClick('documents')}>Documents</button>
                   </div>
                 </section>
 
@@ -1713,6 +1820,16 @@ const EmployeeDashboard = () => {
                 </Card.Body>
               </Card>
             )}
+            {activeTab === 'certificates' && (
+              <div className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.4s' }}>
+                <CertificateManager />
+              </div>
+            )}
+            {activeTab === 'documents' && (
+              <div className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.4s' }}>
+                <DocumentSubmission />
+              </div>
+            )}
             {activeTab === 'reimbursements' && (
               <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.45s' }}>
                 <Card.Body>
@@ -1733,6 +1850,14 @@ const EmployeeDashboard = () => {
               <div className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.6s' }}>
                 <EmployeeSettings />
               </div>
+            )}
+            {activeTab === 'change-password' && (
+              <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.6s' }}>
+                <Card.Body>
+                  <Card.Title className="animate__animated animate__zoomIn">Change Password</Card.Title>
+                  <EmployeePasswordSettings />
+                </Card.Body>
+              </Card>
             )}
             <div className="text-center mt-4">
               <p

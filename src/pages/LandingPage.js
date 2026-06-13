@@ -1,18 +1,23 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   FaArrowRight,
+  FaAward,
   FaCalendarCheck,
   FaCheck,
   FaClock,
   FaFileInvoiceDollar,
+  FaGem,
+  FaMedal,
   FaShieldAlt,
   FaTasks,
+  FaTrophy,
   FaUsers,
 } from 'react-icons/fa';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { usePublicData } from '../contexts/PublicDataContext';
+import api from '../utils/axios';
 import './PublicPage.css';
 
 const metricLabel = {
@@ -39,10 +44,47 @@ const workflowSteps = [
   },
 ];
 
+const getBadgeIcon = (performer) => {
+  const tier = String(performer.badgeTier || '').toLowerCase();
+  if (tier === 'diamond') return <FaGem />;
+  if (tier === 'gold') return <FaTrophy />;
+  if (tier === 'silver') return <FaMedal />;
+  if (tier === 'bronze') return <FaAward />;
+  return Number(performer.rank) === 1 ? <FaTrophy /> : <FaAward />;
+};
+
 const LandingPage = () => {
   const { siteData, loading, error } = usePublicData();
-  const { brand, metrics, features, pricingPlans, settings } = siteData;
+  const { brand, metrics, features, pricingPlans, settings, performance } = siteData;
+  const [performanceData, setPerformanceData] = useState(performance || {});
+  const [selectedMonth, setSelectedMonth] = useState(performance?.month || '');
+  const [performanceLoading, setPerformanceLoading] = useState(false);
+  const [performanceError, setPerformanceError] = useState('');
   const metricEntries = ['employees', 'attendanceToday', 'leaveRequests', 'tasks'];
+  const employees = useMemo(() => performanceData?.employees || [], [performanceData]);
+  const hasPerformanceMonths = (performanceData?.availableMonths || []).length > 0;
+
+  useEffect(() => {
+    if (!performance?.month && !performance?.employees?.length) return;
+    setPerformanceData(performance);
+    setSelectedMonth(performance.month || '');
+  }, [performance]);
+
+  const handleMonthChange = async (event) => {
+    const month = event.target.value;
+    setSelectedMonth(month);
+    setPerformanceLoading(true);
+    setPerformanceError('');
+
+    try {
+      const response = await api.get('/public/performance', { params: { month } });
+      setPerformanceData(response.data?.data || {});
+    } catch (err) {
+      setPerformanceError(err.response?.data?.message || 'Unable to load monthly performance');
+    } finally {
+      setPerformanceLoading(false);
+    }
+  };
 
   return (
     <div className="public-page">
@@ -121,6 +163,73 @@ const LandingPage = () => {
                 );
               })}
             </div>
+
+            {hasPerformanceMonths && (
+              <section className="landing-performers" id="monthly-performance">
+                <div className="landing-section-heading landing-performance-heading">
+                  <div>
+                    <span>Monthly performance</span>
+                    <h2>Eligible employees ranked for {performanceData.monthLabel || 'this month'}.</h2>
+                    <p>Only employees who joined on or before this month are shown. Score is calculated from monthly attendance quality, task completion, leave discipline, and valid HR certificates.</p>
+                  </div>
+                  <label className="landing-month-select">
+                    <span>View month</span>
+                    <select value={selectedMonth} onChange={handleMonthChange}>
+                      {(performanceData.availableMonths || []).map((month) => (
+                        <option key={month.key} value={month.key}>{month.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                {performanceError && <p className="public-page__notice">{performanceError}</p>}
+                {performanceLoading && <p className="public-page__notice">Loading monthly performance...</p>}
+                {employees.length > 0 ? (
+                  <div className="landing-performer-grid">
+                    {employees.map((performer) => (
+                      <article className={`landing-performer-card rank-${performer.rank}`} key={performer.employeeId || performer.name}>
+                        <div className="landing-performer-rank">#{performer.rank}</div>
+                        <div className="landing-performer-photo">
+                          {performer.profilePhoto ? (
+                            <img src={performer.profilePhoto} alt={performer.name} />
+                          ) : (
+                            <span>{String(performer.name || 'E').charAt(0).toUpperCase()}</span>
+                          )}
+                        </div>
+                        <div className="landing-performer-info">
+                          <small className={`landing-performer-badge badge-${performer.badgeTier || 'bronze'}`}>
+                            {getBadgeIcon(performer)}
+                            {performer.badge}
+                          </small>
+                          <h3>{performer.name}</h3>
+                          <p>{performer.position} | {performer.department}</p>
+                          {performer.joiningMonthLabel && (
+                            <p className="landing-performer-joining">Performance visible from {performer.joiningMonthLabel}</p>
+                          )}
+                        </div>
+                        <div className="landing-performer-score">
+                          <strong>{performer.score}</strong>
+                          <span>Performance score</span>
+                        </div>
+                        <div className="landing-performer-stats">
+                          <span><strong>{performer.completedTasks || 0}</strong> tasks</span>
+                          <span><strong>{performer.approvedAttendance || 0}</strong> attendance</span>
+                          <span><strong>{performer.certificates || 0}</strong> certificates</span>
+                        </div>
+                        <div className="landing-score-breakdown">
+                          <span>Attendance <strong>{performer.attendanceScore || 0}</strong></span>
+                          <span>Tasks <strong>{performer.taskScore || 0}</strong></span>
+                          <span>Leave <strong>{performer.leaveScore || 0}</strong></span>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="landing-performance-empty">
+                    No employees are eligible for {performanceData.monthLabel || 'this month'} because their joining month is later.
+                  </div>
+                )}
+              </section>
+            )}
 
             <section className="landing-workflow">
               <div className="landing-section-heading align-left">

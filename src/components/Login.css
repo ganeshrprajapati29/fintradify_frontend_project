@@ -1,5 +1,5 @@
 .login-page {
-  min-height: 100vh;
+  min-height: calc(100vh - 78px);
   display: grid;
   grid-template-columns: minmax(360px, 0.94fr) minmax(420px, 1.06fr);
   background: #f8fafc;
@@ -202,6 +202,30 @@
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
 }
 
+.login-method-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.login-method-tabs button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 7px;
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 900;
+}
+
+.login-method-tabs button.active {
+  background: #dcfce7;
+  color: #166534;
+}
+
 .login-alert {
   border-radius: 8px;
   border: 1px solid #fecaca;
@@ -347,6 +371,20 @@
   background: transparent;
   color: #1d4ed8;
   font-weight: 900;
+}
+
+.login-footer-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.login-footer-links a {
+  color: #1d4ed8;
+  font-weight: 900;
+  text-decoration: none;
 }
 
 .login-modal__header {

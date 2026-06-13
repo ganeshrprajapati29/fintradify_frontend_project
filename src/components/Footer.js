@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { FaEnvelope, FaFacebook, FaGooglePlay, FaInstagram, FaLinkedin, FaMapMarkerAlt, FaPhone, FaTwitter, FaYoutube } from 'react-icons/fa';
+import { FaArrowRight, FaEnvelope, FaFacebook, FaGooglePlay, FaInstagram, FaLinkedin, FaMapMarkerAlt, FaPhone, FaTwitter, FaYoutube } from 'react-icons/fa';
 import { usePublicData } from '../contexts/PublicDataContext';
 import './Footer.css';
 
@@ -43,20 +43,34 @@ const socials = [
 const Footer = ({ darkMode = false }) => {
   const { siteData } = usePublicData();
   const brand = siteData.brand;
+  const logoSrc = brand.logo || '/fintradify-logo.png';
 
   return (
-    <footer className={`public-footer ${darkMode ? 'is-dark' : ''}`}>
+    <footer
+      className={`public-footer ${darkMode ? 'is-dark' : ''}`}
+      style={{ '--footer-logo-watermark': `url("${logoSrc}")` }}
+    >
       <div className="public-footer__inner">
         <div className="public-footer__intro">
           <Link className="public-footer__brand" to="/">
-            <span className="public-footer__mark">F</span>
-            <span>{brand.name}</span>
+            <span className="public-footer__logo-wrap">
+              <img src={logoSrc} alt={brand.shortName || 'Fintradify'} className="public-footer__logo-img" />
+            </span>
+            <span className="public-footer__brand-copy">
+              <strong>{brand.shortName || 'Fintradify'}</strong>
+              <small>HR Portal</small>
+            </span>
           </Link>
           <p>{brand.tagline}</p>
-          <a className="public-footer__store" href={brand.appUrl} target="_blank" rel="noopener noreferrer">
-            <FaGooglePlay />
-            <span>Get it on Google Play</span>
-          </a>
+          <div className="public-footer__actions">
+            <a className="public-footer__store" href={brand.appUrl} target="_blank" rel="noopener noreferrer">
+              <FaGooglePlay />
+              <span>Google Play</span>
+            </a>
+            <Link className="public-footer__cta" to="/verify-certificate">
+              Find Employee <FaArrowRight />
+            </Link>
+          </div>
         </div>
 
         {Object.entries(groups).map(([title, links]) => (
@@ -70,8 +84,8 @@ const Footer = ({ darkMode = false }) => {
       </div>
 
       <div className="public-footer__contact">
-        <span><FaPhone /> {brand.phone}</span>
-        <span><FaEnvelope /> {brand.email}</span>
+        <a href={`tel:${String(brand.phone || '').replace(/\s+/g, '')}`}><FaPhone /> {brand.phone}</a>
+        <a href={`mailto:${brand.email}`}><FaEnvelope /> {brand.email}</a>
         <span><FaMapMarkerAlt /> {brand.address}</span>
       </div>
 

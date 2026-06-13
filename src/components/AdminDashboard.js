@@ -32,6 +32,12 @@ import EmployeeTeams from './EmployeeTeams';
 import EmployeeTracking from './EmployeeTracking';
 import RelievingLetter from './RelievingLetter';
 import OfferLetter from './OfferLetter';
+import CertificateManager from './CertificateManager';
+import DocumentSubmission from './DocumentSubmission';
+import AdminCredentials from './AdminCredentials';
+import AdminPerformanceReport from './AdminPerformanceReport';
+import AdminReportsCenter from './AdminReportsCenter';
+import AdminComplianceCenter from './AdminComplianceCenter';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'animate.css';
 
@@ -43,6 +49,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 const ADMIN_TABS = [
   'overview',
+  'reports-center',
   'add-employee',
   'edit-employee',
   'employee-list',
@@ -55,17 +62,23 @@ const ADMIN_TABS = [
   'active-attendance',
   'leaves',
   'paid-leaves',
+  'monthly-performance',
   'tasks',
   'salary',
   'relieving-letter',
   'offer-letter',
+  'certificates',
+  'documents',
+  'compliance-center',
   'reimbursements',
   'notifications',
+  'login-credentials',
   'settings',
 ];
 
 const TAB_LABELS = {
   overview: 'Dashboard',
+  'reports-center': 'Reports Center',
   'add-employee': 'Add Employee',
   'edit-employee': 'Edit Employee',
   'employee-list': 'Employee List',
@@ -78,15 +91,45 @@ const TAB_LABELS = {
   'active-attendance': 'Active Attendance',
   leaves: 'Leave Requests',
   'paid-leaves': 'Paid Leaves',
+  'monthly-performance': 'Monthly Performance',
   tasks: 'Tasks',
   salary: 'Salary Slips',
   'relieving-letter': 'Relieving Letter',
   'offer-letter': 'Offer Letter',
+  certificates: 'Certificates',
+  documents: 'Documents',
+  'compliance-center': 'Compliance Center',
   reimbursements: 'Reimbursements',
   notifications: 'Notifications',
+  'login-credentials': 'Login Credentials',
   settings: 'Settings',
 };
 
+const ADMIN_NAV_GROUPS = [
+  { title: 'Overview', items: ['overview', 'reports-center'] },
+  { title: 'People', items: ['add-employee', 'edit-employee', 'employee-list', 'block-employees', 'unblock-employees', 'teams', 'tracking'] },
+  { title: 'Attendance & Leave', items: ['attendance', 'manual-attendance', 'active-attendance', 'leaves', 'paid-leaves'] },
+  { title: 'Work & Payroll', items: ['monthly-performance', 'tasks', 'salary', 'reimbursements'] },
+  { title: 'HR Documents', items: ['relieving-letter', 'offer-letter', 'certificates', 'documents', 'compliance-center'] },
+  { title: 'System', items: ['notifications', 'login-credentials', 'settings'] },
+];
+
+const renderAdminNavIcon = (tab) => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    {tab === 'overview' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 19V9m5 10V5m5 14v-7m5 7V3" />}
+    {tab === 'reports-center' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 19h16M7 16V9m5 7V5m5 11v-4M6 5h12" />}
+    {['add-employee', 'edit-employee', 'employee-list', 'block-employees', 'unblock-employees', 'teams'].includes(tab) && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m4 6v-2a4 4 0 00-8 0v2m12-10a4 4 0 11-8 0 4 4 0 018 0zm6 1a3 3 0 11-6 0 3 3 0 016 0z" />}
+    {tab === 'tracking' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 11a3 3 0 100-6 3 3 0 000 6zm0 10s7-4.5 7-11a7 7 0 10-14 0c0 6.5 7 11 7 11z" />}
+    {['attendance', 'manual-attendance', 'active-attendance', 'leaves', 'paid-leaves'].includes(tab) && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3M5 11h14M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />}
+    {['tasks', 'salary', 'reimbursements'].includes(tab) && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5h11M9 12h11M9 19h11M4 5l1 1 2-2M4 12l1 1 2-2M4 19l1 1 2-2" />}
+    {tab === 'monthly-performance' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 19V9m5 10V5m5 14v-7m5 7V3M4 19h16" />}
+    {['relieving-letter', 'offer-letter', 'certificates', 'documents'].includes(tab) && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6M7 3h7l5 5v13a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z" />}
+    {tab === 'compliance-center' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3l7 4v5c0 5-3.2 8-7 9-3.8-1-7-4-7-9V7l7-4zm-3 9l2 2 4-5" />}
+    {tab === 'notifications' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0a3 3 0 01-6 0" />}
+    {tab === 'login-credentials' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 11V8a4 4 0 10-8 0v3m8 0h2a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2v-6a2 2 0 012-2h8zm6 4l2 2 4-4" />}
+    {tab === 'settings' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.3 4.3a1.7 1.7 0 013.4 0 1.7 1.7 0 002.6 1.1 1.7 1.7 0 012.4 2.4 1.7 1.7 0 001.1 2.6 1.7 1.7 0 010 3.4 1.7 1.7 0 00-1.1 2.6 1.7 1.7 0 01-2.4 2.4 1.7 1.7 0 00-2.6 1.1 1.7 1.7 0 01-3.4 0 1.7 1.7 0 00-2.6-1.1 1.7 1.7 0 01-2.4-2.4 1.7 1.7 0 00-1.1-2.6 1.7 1.7 0 010-3.4 1.7 1.7 0 001.1-2.6 1.7 1.7 0 012.4-2.4 1.7 1.7 0 002.6-1.1z" />}
+  </svg>
+);
 
 // EmployeeList component
 const EmployeeList = ({ mode }) => {
@@ -530,6 +573,37 @@ const AdminDashboard = () => {
     setShowSidebar(false);
   };
 
+  const renderAdminGroupedNav = () => (
+    <Nav className="admin-sidebar-nav sidebar-grouped-nav">
+      {ADMIN_NAV_GROUPS.map((group) => {
+        const isOpen = group.items.includes(activeTab);
+        return (
+          <details className="sidebar-group" key={group.title} open={isOpen}>
+            <summary className="sidebar-group-title">
+              <span>{group.title}</span>
+              <svg className="sidebar-group-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 9l6 6 6-6" />
+              </svg>
+            </summary>
+            <div className="sidebar-group-items">
+              {group.items.map((tab) => (
+                <Nav.Link
+                  key={tab}
+                  className={`animate__animated animate__fadeInLeft ${activeTab === tab ? 'active' : ''}`}
+                  onClick={() => handleTabClick(tab)}
+                  aria-current={activeTab === tab ? 'page' : undefined}
+                >
+                  {renderAdminNavIcon(tab)}
+                  <span>{TAB_LABELS[tab] || tab}</span>
+                </Nav.Link>
+              ))}
+            </div>
+          </details>
+        );
+      })}
+    </Nav>
+  );
+
   return (
     <>
       <style>
@@ -900,6 +974,56 @@ const AdminDashboard = () => {
             overflow-y: auto;
             padding-right: 0.2rem;
           }
+          .admin-sidebar-nav:not(.sidebar-grouped-nav) {
+            display: flex;
+          }
+          .sidebar-grouped-nav {
+            display: none;
+          }
+          .sidebar-group {
+            border: 1px solid #e2e8f0;
+            border-radius: 0.85rem;
+            background: #ffffff;
+            overflow: hidden;
+          }
+          .sidebar-group[open] {
+            background: #f8fafc;
+            border-color: #bfdbfe;
+          }
+          .sidebar-group-title {
+            list-style: none;
+            cursor: pointer;
+            min-height: 42px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding: 0.68rem 0.75rem;
+            color: #0f172a;
+            font-size: 0.76rem;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+          }
+          .sidebar-group-title::-webkit-details-marker {
+            display: none;
+          }
+          .sidebar-group-chevron {
+            width: 16px;
+            height: 16px;
+            color: #64748b;
+            transition: transform 0.2s ease;
+            flex: 0 0 auto;
+          }
+          .sidebar-group[open] .sidebar-group-chevron {
+            transform: rotate(180deg);
+          }
+          .sidebar-group-items {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+            padding: 0 0.45rem 0.45rem;
+          }
           .admin-sidebar-nav::-webkit-scrollbar {
             width: 6px;
           }
@@ -909,14 +1033,15 @@ const AdminDashboard = () => {
           }
           .nav-link {
             color: #475569 !important;
-            padding: 0.72rem 0.75rem;
-            border-radius: 0.75rem;
+            padding: 0.52rem 0.62rem;
+            border-radius: 0.62rem;
             margin: 0;
-            font-size: 0.95rem;
+            font-size: 0.84rem;
             font-weight: 700;
-            gap: 0.75rem;
-            min-height: 46px;
+            gap: 0.55rem;
+            min-height: 34px;
             border: 1px solid transparent;
+            white-space: nowrap;
           }
           .nav-link::before {
             display: none;
@@ -941,15 +1066,15 @@ const AdminDashboard = () => {
             position: absolute;
             right: 0.45rem;
             width: 6px;
-            height: 24px;
+            height: 18px;
             border-radius: 999px;
             background: #2563eb;
           }
           .nav-link svg {
-            width: 20px;
-            height: 20px;
+            width: 16px;
+            height: 16px;
             flex-shrink: 0;
-            padding: 0.45rem;
+            padding: 0.32rem;
             box-sizing: content-box;
             border-radius: 0.65rem;
             color: #1d4ed8;
@@ -1662,6 +1787,7 @@ const AdminDashboard = () => {
               <span>{profile.position || profile.employeeId || 'Operations lead'}</span>
             </div>
           </div>
+          {renderAdminGroupedNav()}
           <Nav className="admin-sidebar-nav">
             {ADMIN_TABS.map((tab) => (
               <Nav.Link
@@ -1687,10 +1813,13 @@ const AdminDashboard = () => {
                   {tab === 'salary' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />}
                   {tab === 'relieving-letter' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />}
                   {tab === 'offer-letter' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />}
+                  {tab === 'certificates' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4M7 3h10a2 2 0 012 2v14l-3-2-3 2-3-2-3 2V5a2 2 0 012-2z" />}
+                  {tab === 'documents' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6M7 3h7l5 5v13a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z" />}
                   {tab === 'reimbursements' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />}
                   {tab === 'notifications' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />}
                   {tab === 'teams' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />}
                   {tab === 'tracking' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />}
+                  {tab === 'login-credentials' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 11V8a4 4 0 10-8 0v3m8 0h2a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2v-6a2 2 0 012-2h8zm6 4l2 2 4-4" />}
                   {tab === 'settings' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />}
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
@@ -1809,6 +1938,7 @@ const AdminDashboard = () => {
                   <span>{profile.position || profile.employeeId || 'Operations lead'}</span>
                 </div>
               </div>
+              {renderAdminGroupedNav()}
               <Nav className="admin-sidebar-nav">
                 {ADMIN_TABS.map((tab) => (
                   <Nav.Link
@@ -1825,6 +1955,7 @@ const AdminDashboard = () => {
                       {tab === 'attendance' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />}
                       {tab === 'leaves' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />}
                       {tab === 'salary' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />}
+                      {tab === 'login-credentials' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 11V8a4 4 0 10-8 0v3m8 0h2a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2v-6a2 2 0 012-2h8zm6 4l2 2 4-4" />}
                     </svg>
                     <span>{TAB_LABELS[tab] || tab}</span>
                   </Nav.Link>
@@ -2132,6 +2263,11 @@ const AdminDashboard = () => {
                 </section>
               </div>
             )}
+            {activeTab === 'reports-center' && (
+              <div className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.15s' }}>
+                <AdminReportsCenter onNavigate={handleTabClick} />
+              </div>
+            )}
             {activeTab === 'add-employee' && (
               <div className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.1s' }}>
                 <EmployeeForm />
@@ -2198,6 +2334,11 @@ const AdminDashboard = () => {
                 <PaidLeaves isAdmin />
               </div>
             )}
+            {activeTab === 'monthly-performance' && (
+              <div className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.5s' }}>
+                <AdminPerformanceReport />
+              </div>
+            )}
             {activeTab === 'tasks' && (
               <div className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.5s' }}>
                 <AdminTasks />
@@ -2216,6 +2357,21 @@ const AdminDashboard = () => {
             {activeTab === 'offer-letter' && (
               <div className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.65s' }}>
                 <OfferLetter />
+              </div>
+            )}
+            {activeTab === 'certificates' && (
+              <div className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.65s' }}>
+                <CertificateManager isAdmin />
+              </div>
+            )}
+            {activeTab === 'documents' && (
+              <div className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.65s' }}>
+                <DocumentSubmission isAdmin />
+              </div>
+            )}
+            {activeTab === 'compliance-center' && (
+              <div className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.65s' }}>
+                <AdminComplianceCenter onNavigate={handleTabClick} />
               </div>
             )}
             {activeTab === 'reimbursements' && (
@@ -2241,6 +2397,14 @@ const AdminDashboard = () => {
                 <Card.Body>
                   <h3 className="mb-4 fw-bold text-primary-800">Employee Tracking</h3>
                   <EmployeeTracking />
+                </Card.Body>
+              </Card>
+            )}
+            {activeTab === 'login-credentials' && (
+              <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.7s' }}>
+                <Card.Body>
+                  <h3 className="mb-4 fw-bold text-primary-800">Login Credentials</h3>
+                  <AdminCredentials />
                 </Card.Body>
               </Card>
             )}

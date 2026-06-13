@@ -23,6 +23,7 @@ const Login = () => {
   const [showOtp, setShowOtp] = useState(false);
   const [error, setError] = useState('');
   const [role, setRole] = useState('admin');
+  const [employeeLoginMethod, setEmployeeLoginMethod] = useState('password');
   const [isLoading, setIsLoading] = useState(false);
   const [otpTimer, setOtpTimer] = useState(0);
   const [canResend, setCanResend] = useState(false);
@@ -56,6 +57,7 @@ const Login = () => {
     setEmail('');
     setPassword('');
     setOtp(['', '', '', '']);
+    setEmployeeLoginMethod('password');
     setError('');
     setOtpTimer(0);
     setCanResend(false);
@@ -84,17 +86,20 @@ const Login = () => {
     setError('');
 
     try {
-      if (!email || (role === 'admin' && !password) || (role === 'employee' && showOtp && otp.join('').length !== 4)) {
+      const needsPassword = role === 'admin' || (role === 'employee' && employeeLoginMethod === 'password');
+      const needsOtp = role === 'employee' && employeeLoginMethod === 'otp' && showOtp;
+
+      if (!email || (needsPassword && !password) || (needsOtp && otp.join('').length !== 4)) {
         throw new Error('Please fill in all required fields.');
       }
 
-      if (role === 'admin') {
+      if (role === 'admin' || employeeLoginMethod === 'password') {
         const res = await api.post('/auth/login', {
           email: sanitizeInput(email),
           password: sanitizeInput(password),
         });
         localStorage.setItem('token', res.data.token);
-        history.push('/admin');
+        history.push(role === 'admin' ? '/admin' : '/employee');
         return;
       }
 
@@ -152,6 +157,16 @@ const Login = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const switchEmployeeMethod = (method) => {
+    setEmployeeLoginMethod(method);
+    setShowOtp(false);
+    setPassword('');
+    setOtp(['', '', '', '']);
+    setError('');
+    setOtpTimer(0);
+    setCanResend(false);
+  };
+
   return (
     <main className="login-page">
       <section className="login-page__story">
@@ -175,7 +190,7 @@ const Login = () => {
 
         <div className="login-page__benefits">
           <span><FaShieldAlt /> Protected admin dashboard</span>
-          <span><FaKey /> Email OTP for employees</span>
+          <span><FaKey /> Password and OTP login for employees</span>
           <span><FaBuilding /> Company settings connected</span>
         </div>
       </section>
@@ -187,8 +202,8 @@ const Login = () => {
               {role === 'admin' ? <FaUserTie /> : <FaShieldAlt />}
             </span>
             <div>
-              <h2>{role === 'admin' ? 'Admin Login' : 'Employee Login'}</h2>
-              <p>{role === 'admin' ? 'Use your admin email and password.' : 'Use your email to receive a secure OTP.'}</p>
+              <h2>{role === 'admin' ? 'Manager Login' : 'Employee Login'}</h2>
+              <p>{role === 'admin' ? 'Use your Manager email and password.' : 'Use password login or receive a secure email OTP.'}</p>
             </div>
           </div>
 
@@ -212,6 +227,25 @@ const Login = () => {
           {error && <Alert variant="danger" className="login-alert">{error}</Alert>}
 
           <Form onSubmit={handleLogin} className="login-form">
+            {role === 'employee' && (
+              <div className="login-method-tabs" role="tablist" aria-label="Select employee login method">
+                <button
+                  type="button"
+                  className={employeeLoginMethod === 'password' ? 'active' : ''}
+                  onClick={() => switchEmployeeMethod('password')}
+                >
+                  Password
+                </button>
+                <button
+                  type="button"
+                  className={employeeLoginMethod === 'otp' ? 'active' : ''}
+                  onClick={() => switchEmployeeMethod('otp')}
+                >
+                  Email OTP
+                </button>
+              </div>
+            )}
+
             <Form.Group className="login-field">
               <Form.Label>Email address</Form.Label>
               <div className="login-input">
@@ -226,7 +260,7 @@ const Login = () => {
               </div>
             </Form.Group>
 
-            {role === 'admin' && (
+            {(role === 'admin' || (role === 'employee' && employeeLoginMethod === 'password')) && (
               <Form.Group className="login-field">
                 <Form.Label>Password</Form.Label>
                 <div className="login-input">
@@ -242,7 +276,7 @@ const Login = () => {
               </Form.Group>
             )}
 
-            {role === 'employee' && showOtp && (
+            {role === 'employee' && employeeLoginMethod === 'otp' && showOtp && (
               <div className="login-otp">
                 <Form.Label>Verification code</Form.Label>
                 <div className="login-otp__inputs">
@@ -279,14 +313,21 @@ const Login = () => {
                   Processing...
                 </>
               ) : (
-                role === 'admin' ? 'Sign in securely' : showOtp ? 'Verify OTP' : 'Send OTP'
+                role === 'admin'
+                  ? 'Sign in securely'
+                  : employeeLoginMethod === 'password'
+                    ? 'Login with Password'
+                    : showOtp ? 'Verify OTP' : 'Send OTP'
               )}
             </Button>
           </Form>
 
           <div className="login-card__footer">
             <span><FaCheckCircle /> Secure session access</span>
-            <button type="button" onClick={() => setShowPrivacyModal(true)}>Privacy Policy</button>
+            <div className="login-footer-links">
+              {role === 'employee' && <Link to="/forgot-password">Reset Password</Link>}
+              <button type="button" onClick={() => setShowPrivacyModal(true)}>Privacy Policy</button>
+            </div>
           </div>
         </div>
       </section>

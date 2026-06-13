@@ -31,6 +31,14 @@ const fallbackData = {
   },
   features: [],
   pricingPlans: [],
+  topPerformers: [],
+  performance: {
+    month: '',
+    monthLabel: '',
+    availableMonths: [],
+    employees: [],
+    topEmployees: [],
+  },
   pages: {},
 };
 

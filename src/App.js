@@ -1,10 +1,11 @@
 
-import React from 'react';
-import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Route, Switch, useLocation } from 'react-router-dom';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { PublicDataProvider } from './contexts/PublicDataContext';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
+import ForgotPassword from './pages/ForgotPassword';
 import AdminPage from './pages/AdminPage';
 import EmployeePage from './pages/EmployeePage';
 import PrivacyPolicy from './pages/PrivacyPolicy';
@@ -24,19 +25,33 @@ import Careers from './pages/Careers';
 import Documentation from './pages/Documentation';
 import Status from './pages/Status';
 import Compliance from './pages/Compliance';
+import CertificateVerification from './pages/CertificateVerification';
 
 import './styles.css';
+
+const ScrollToTop = () => {
+  const { pathname, search } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+  }, [pathname, search]);
+
+  return null;
+};
 
 function App() {
   return (
     <SettingsProvider>
       <PublicDataProvider>
         <Router>
+          <ScrollToTop />
           <Switch>
             <Route exact path="/" component={LandingPage} />
             <Route path="/login" component={LoginPage} />
+            <Route path="/forgot-password" component={ForgotPassword} />
             <Route path="/admin" component={AdminPage} />
             <Route path="/employee" component={EmployeePage} />
+            <Route path="/verify-certificate" component={CertificateVerification} />
             <Route path="/privacy-policy" component={PrivacyPolicy} />
             <Route path="/terms" component={TermsOfService} />
             <Route path="/cookies" component={Cookies} />
