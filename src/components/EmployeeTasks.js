@@ -20,6 +20,8 @@ const getPriorityMeta = (priority) => {
   return { label: 'Medium', className: 'medium' };
 };
 
+const getTaskStatus = (status) => String(status || 'pending').toLowerCase().replace(/\s+/g, '-');
+
 const EmployeeTasks = () => {
   const [tasks, setTasks] = useState([]);
   const [error, setError] = useState('');
@@ -54,7 +56,7 @@ const EmployeeTasks = () => {
 
   const summary = useMemo(() => {
     return tasks.reduce((acc, task) => {
-      const status = String(task.status || 'pending').toLowerCase();
+      const status = getTaskStatus(task.status);
       acc[status] = (acc[status] || 0) + 1;
       return acc;
     }, { pending: 0, 'in-progress': 0, completed: 0 });
@@ -357,7 +359,8 @@ const EmployeeTasks = () => {
         ) : paginatedTasks.length > 0 ? (
           <div className="task-list">
             {paginatedTasks.map((task) => {
-              const statusMeta = getStatusMeta(task.status);
+              const taskStatus = getTaskStatus(task.status);
+              const statusMeta = getStatusMeta(taskStatus);
               const priorityMeta = getPriorityMeta(task.priority);
               const isUpdating = updatingTaskId === task._id;
               return (
@@ -379,17 +382,17 @@ const EmployeeTasks = () => {
                     )}
                   </div>
                   <div className="task-actions">
-                    {task.status === 'pending' && (
-                      <Button className="task-action-btn" variant="primary" disabled={isUpdating} onClick={() => handleStatusUpdate(task._id, 'in-progress')}>
-                        {isUpdating ? <Spinner animation="border" size="sm" /> : 'Start Task'}
-                      </Button>
-                    )}
-                    {task.status === 'in-progress' && (
+                    {taskStatus !== 'completed' && (
                       <Button className="task-action-btn" variant="success" onClick={() => openSubmitModal(task)}>
                         Submit Task
                       </Button>
                     )}
-                    {task.status === 'completed' && (
+                    {taskStatus === 'pending' && (
+                      <Button className="task-action-btn" variant="primary" disabled={isUpdating} onClick={() => handleStatusUpdate(task._id, 'in-progress')}>
+                        {isUpdating ? <Spinner animation="border" size="sm" /> : 'Start Task'}
+                      </Button>
+                    )}
+                    {taskStatus === 'completed' && (
                       <Button className="task-action-btn" variant="outline-success" disabled>
                         Done
                       </Button>

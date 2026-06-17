@@ -31,6 +31,18 @@ const typeLabels = {
   employment: 'Employment',
 };
 
+const getCertificateDownloadUrl = (certificate) => {
+  if (!certificate?.certificateNo) return certificate?.certificateUrl || '#';
+  const baseUrl = api.defaults.baseURL || process.env.REACT_APP_API_URL || 'https://crm.fintradify.com/api';
+  return `${baseUrl.replace(/\/$/, '')}/certificates/download/${encodeURIComponent(certificate.certificateNo)}`;
+};
+
+const getCertificatePreviewUrl = (certificate) => {
+  if (!certificate?.certificateNo) return certificate?.certificateUrl || '#';
+  const baseUrl = api.defaults.baseURL || process.env.REACT_APP_API_URL || 'https://crm.fintradify.com/api';
+  return `${baseUrl.replace(/\/$/, '')}/certificates/preview/${encodeURIComponent(certificate.certificateNo)}`;
+};
+
 const CertificateManager = ({ isAdmin = false }) => {
   const [employees, setEmployees] = useState([]);
   const [certificates, setCertificates] = useState([]);
@@ -215,7 +227,7 @@ const CertificateManager = ({ isAdmin = false }) => {
         <div>
           <p className="certificate-eyebrow">{isAdmin ? 'HR documents' : 'Verified records'}</p>
           <h2 className="certificate-title">{isAdmin ? 'Certificate Generator' : 'My Certificates'}</h2>
-          <p className="certificate-subtitle">{isAdmin ? 'Generate internship, employment, and experience certificates with unique public verification.' : 'Download official certificates issued by Fintradify HR.'}</p>
+          <p className="certificate-subtitle">{isAdmin ? 'Generate one-page A4 certificates with logo watermark, signatures, stamp, email delivery, and QR verification.' : 'Download official QR-verifiable certificates issued by Fintradify HR.'}</p>
         </div>
         <Button className="certificate-action-btn" variant="outline-primary" onClick={fetchData} disabled={loading}>Refresh</Button>
       </section>
@@ -261,7 +273,7 @@ const CertificateManager = ({ isAdmin = false }) => {
               </div>
               <div className="certificate-actions">
                 <Button className="certificate-action-btn" type="submit" disabled={submitting || loading}>
-                  {submitting ? (editingCertificate ? 'Saving...' : 'Generating...') : (editingCertificate ? 'Save Changes & Regenerate PDF' : 'Generate & Email Certificate')}
+                  {submitting ? (editingCertificate ? 'Saving...' : 'Generating...') : (editingCertificate ? 'Save Changes & Regenerate PDF' : 'Generate A4 Certificate & Email')}
                 </Button>
                 {editingCertificate && (
                   <Button className="certificate-action-btn" type="button" variant="outline-secondary" onClick={resetForm} disabled={submitting}>
@@ -293,7 +305,8 @@ const CertificateManager = ({ isAdmin = false }) => {
                       <td>
                         <div className="certificate-actions">
                           {isAdmin && <Button className="certificate-action-btn" size="sm" variant="outline-dark" onClick={() => startEdit(certificate)}>Edit</Button>}
-                          <Button className="certificate-action-btn" size="sm" variant="outline-primary" href={certificate.certificateUrl} target="_blank" rel="noopener noreferrer">Download PDF</Button>
+                          <Button className="certificate-action-btn" size="sm" variant="outline-secondary" href={getCertificatePreviewUrl(certificate)} target="_blank" rel="noopener noreferrer">Preview</Button>
+                          <Button className="certificate-action-btn" size="sm" variant="outline-primary" href={getCertificateDownloadUrl(certificate)} target="_blank" rel="noopener noreferrer">Download PDF</Button>
                           <Button className="certificate-action-btn" size="sm" variant="outline-success" href={`/verify-certificate?certificateNo=${encodeURIComponent(certificate.certificateNo)}`} target="_blank" rel="noopener noreferrer">Verify</Button>
                           {isAdmin && certificate.verificationStatus === 'valid' && <Button className="certificate-action-btn" size="sm" variant="outline-warning" onClick={() => revokeCertificate(certificate._id)}>Revoke</Button>}
                           {isAdmin && <Button className="certificate-action-btn" size="sm" variant="outline-danger" onClick={() => deleteCertificate(certificate._id)}>Delete</Button>}

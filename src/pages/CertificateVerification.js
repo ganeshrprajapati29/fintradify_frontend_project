@@ -23,6 +23,13 @@ const getDownloadUrl = (certificate) => {
   return `${apiBase}/certificates/download/${encodeURIComponent(certificate.certificateNo)}`;
 };
 
+const getPreviewUrl = (certificate) => {
+  if (!certificate?.certificateNo) return certificate?.certificateUrl || '';
+  if (certificate.previewUrl?.startsWith('http')) return certificate.previewUrl;
+  if (certificate.previewUrl) return `${apiBase.replace(/\/api$/, '')}${certificate.previewUrl}`;
+  return `${apiBase}/certificates/preview/${encodeURIComponent(certificate.certificateNo)}`;
+};
+
 const CertificateVerification = () => {
   const query = useQuery();
   const [search, setSearch] = useState(query.get('certificateNo') || '');
@@ -182,7 +189,7 @@ const CertificateVerification = () => {
                 <div className="verify-preview-summary">
                   <p className="verify-eyebrow">{selectedCertificate.type} certificate</p>
                   <h3>{selectedCertificate.employee?.name || employee?.name || 'Employee'}</h3>
-                  <p>{selectedCertificate.description || `${selectedCertificate.title || 'Certificate'} issued by Fintradify.`}</p>
+                  <p>{selectedCertificate.description || `${selectedCertificate.title || 'Certificate'} issued by Fintradify with a one-page A4 PDF, logo watermark, certificate number, and QR verification.`}</p>
                   <div className="verify-list" style={{ marginTop: '1rem' }}>
                     <div className="verify-row"><span>Certificate No</span><strong>{selectedCertificate.certificateNo}</strong></div>
                     <div className="verify-row"><span>Designation</span><strong>{selectedCertificate.designation || 'N/A'}</strong></div>
@@ -191,8 +198,8 @@ const CertificateVerification = () => {
                     <div className="verify-row"><span>Status</span><strong>{selectedCertificate.verificationStatus}</strong></div>
                   </div>
                 </div>
-                {selectedCertificate.certificateUrl ? (
-                  <iframe className="verify-preview-frame" src={selectedCertificate.certificateUrl} title={selectedCertificate.certificateNo} />
+                {getPreviewUrl(selectedCertificate) ? (
+                  <iframe className="verify-preview-frame" src={getPreviewUrl(selectedCertificate)} title={selectedCertificate.certificateNo} />
                 ) : (
                   <div className="verify-preview-fallback">Certificate PDF preview is not available.</div>
                 )}
