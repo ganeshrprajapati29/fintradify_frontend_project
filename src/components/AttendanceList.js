@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Alert, Pagination, Form, Row, Col, Spinner } from 'react-bootstrap';
+import { Table, Button, Alert, Badge, Pagination, Form, Row, Col, Spinner } from 'react-bootstrap';
 import moment from 'moment';
 import api from '../utils/axios';
 
@@ -368,6 +368,7 @@ const AttendanceList = ({ status }) => {
                     <th>Punch In</th>
                     <th>Punch Out</th>
                     <th>Hours Worked</th>
+                    <th>Mode</th>
                     <th>Status</th>
                   </tr>
                 </thead>
@@ -386,6 +387,11 @@ const AttendanceList = ({ status }) => {
                           <td>{att.punchOut ? moment(att.punchOut).format('HH:mm:ss') : '-'}</td>
                           <td>{hoursWorked}</td>
                           <td>
+                            <Badge bg={att.mode === 'wfh' ? 'info' : 'secondary'}>
+                              {att.mode === 'wfh' ? 'WFH' : 'Office'}
+                            </Badge>
+                          </td>
+                          <td>
                             <span className={`status-badge status-${att.status}`}>
                               {att.status}
                             </span>
@@ -395,7 +401,7 @@ const AttendanceList = ({ status }) => {
                     })
                   ) : (
                     <tr>
-                      <td colSpan="7" className="table-empty">
+                      <td colSpan="8" className="table-empty">
                         No {status} attendances found
                       </td>
                     </tr>

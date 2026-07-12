@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Badge, Button, Col, Form, Pagination, Row, Spinner, Table } from 'react-bootstrap';
+import { Alert, Badge, Button, Col, Form, Modal, Pagination, Row, Spinner, Table } from 'react-bootstrap';
 import moment from 'moment';
 import api from '../utils/axios';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -53,6 +53,7 @@ const AttendanceTable = ({ isEmployee }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [punchStatus, setPunchStatus] = useState({ canPunchIn: true, canPunchOut: false });
+  const [punchModePopup, setPunchModePopup] = useState(null);
 
   const endpoint = isEmployee ? '/attendance/my-attendance' : '/attendance';
 
@@ -137,6 +138,13 @@ const AttendanceTable = ({ isEmployee }) => {
       const response = await api.post('/attendance/punch', { type });
       setSuccess(response.data.message || `Punch ${type} recorded successfully`);
       setError('');
+      if (type === 'in' && response.data.popupMessage) {
+        setPunchModePopup({
+          title: response.data.popupTitle || 'Punch In Recorded',
+          message: response.data.popupMessage,
+          mode: response.data.modeLabel,
+        });
+      }
       fetchAttendance();
     } catch (err) {
       setSuccess('');
@@ -718,6 +726,21 @@ const AttendanceTable = ({ isEmployee }) => {
           {renderPagination()}
         </div>
       </section>
+
+      <Modal show={!!punchModePopup} onHide={() => setPunchModePopup(null)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>{punchModePopup?.title}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Badge bg={punchModePopup?.mode === 'WFH' ? 'info' : 'secondary'} className="mb-2">
+            {punchModePopup?.mode}
+          </Badge>
+          <p className="mb-0">{punchModePopup?.message}</p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="primary" onClick={() => setPunchModePopup(null)}>OK</Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 };

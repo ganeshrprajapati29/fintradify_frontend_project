@@ -20,6 +20,7 @@ import AttendanceTable from './AttendanceTable';
 import AttendanceList from './AttendanceList';
 import LeaveRequest from './LeaveRequest';
 import WFHRequest from './WFHRequest';
+import AdminAttendanceRadius from './AdminAttendanceRadius';
 import SalarySlip from './SalarySlip';
 import ManualAttendance from './ManualAttendance';
 import ActiveAttendance from './ActiveAttendance';
@@ -64,6 +65,7 @@ const ADMIN_TABS = [
   'leaves',
   'paid-leaves',
   'wfh',
+  'attendance-radius',
   'monthly-performance',
   'tasks',
   'salary',
@@ -94,6 +96,7 @@ const TAB_LABELS = {
   leaves: 'Leave Requests',
   'paid-leaves': 'Paid Leaves',
   wfh: 'Work From Home',
+  'attendance-radius': 'Attendance Radius',
   'monthly-performance': 'Monthly Performance',
   tasks: 'Tasks',
   salary: 'Salary Slips',
@@ -111,7 +114,7 @@ const TAB_LABELS = {
 const ADMIN_NAV_GROUPS = [
   { title: 'Overview', items: ['overview', 'reports-center'] },
   { title: 'People', items: ['add-employee', 'edit-employee', 'employee-list', 'block-employees', 'unblock-employees', 'teams', 'tracking'] },
-  { title: 'Attendance & Leave', items: ['attendance', 'manual-attendance', 'active-attendance', 'leaves', 'paid-leaves', 'wfh'] },
+  { title: 'Attendance & Leave', items: ['attendance', 'manual-attendance', 'active-attendance', 'leaves', 'paid-leaves', 'wfh', 'attendance-radius'] },
   { title: 'Work & Payroll', items: ['monthly-performance', 'tasks', 'salary', 'reimbursements'] },
   { title: 'HR Documents', items: ['relieving-letter', 'offer-letter', 'certificates', 'documents', 'compliance-center'] },
   { title: 'System', items: ['notifications', 'login-credentials', 'settings'] },
@@ -125,6 +128,7 @@ const renderAdminNavIcon = (tab) => (
     {tab === 'tracking' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 11a3 3 0 100-6 3 3 0 000 6zm0 10s7-4.5 7-11a7 7 0 10-14 0c0 6.5 7 11 7 11z" />}
     {['attendance', 'manual-attendance', 'active-attendance', 'leaves', 'paid-leaves'].includes(tab) && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3M5 11h14M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />}
     {tab === 'wfh' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7m-9 11v-6h4v6m5-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-8 0H6a1 1 0 01-1-1V10" />}
+    {tab === 'attendance-radius' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 11a3 3 0 100-6 3 3 0 000 6zm0 10s7-4.5 7-11a7 7 0 10-14 0c0 6.5 7 11 7 11z" />}
     {['tasks', 'salary', 'reimbursements'].includes(tab) && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5h11M9 12h11M9 19h11M4 5l1 1 2-2M4 12l1 1 2-2M4 19l1 1 2-2" />}
     {tab === 'monthly-performance' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 19V9m5 10V5m5 14v-7m5 7V3M4 19h16" />}
     {['relieving-letter', 'offer-letter', 'certificates', 'documents'].includes(tab) && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6M7 3h7l5 5v13a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z" />}
@@ -2340,6 +2344,11 @@ const AdminDashboard = () => {
             {activeTab === 'wfh' && (
               <div className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.4s' }}>
                 <WFHRequest isAdmin />
+              </div>
+            )}
+            {activeTab === 'attendance-radius' && (
+              <div className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.4s' }}>
+                <AdminAttendanceRadius />
               </div>
             )}
             {activeTab === 'manual-attendance' && (

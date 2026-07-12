@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, Col, Form, Modal, Pagination, Row, Spinner, Table } from 'react-bootstrap';
+import { Alert, Badge, Button, Col, Form, Modal, Pagination, Row, Spinner, Table } from 'react-bootstrap';
 import axios from 'axios';
 import moment from 'moment';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -43,6 +43,7 @@ const ManualAttendance = () => {
     date: moment().format('YYYY-MM-DD'),
     punchIn: '',
     punchOut: '',
+    mode: 'office',
   });
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
@@ -52,7 +53,7 @@ const ManualAttendance = () => {
   const [success, setSuccess] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingAttendance, setEditingAttendance] = useState(null);
-  const [editForm, setEditForm] = useState({ punchIn: '', punchOut: '', holiday: false, halfDay: false });
+  const [editForm, setEditForm] = useState({ punchIn: '', punchOut: '', holiday: false, halfDay: false, mode: 'office' });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -147,11 +148,12 @@ const ManualAttendance = () => {
         date: formData.date,
         punchIn: formData.punchIn ? `${formData.date}T${formData.punchIn}:00` : undefined,
         punchOut: formData.punchOut ? `${formData.date}T${formData.punchOut}:00` : undefined,
+        mode: formData.mode,
       };
 
       await axios.post(`${process.env.REACT_APP_API_URL}/attendance/admin/punch`, payload, { headers: authHeaders });
       setSuccess('Manual attendance recorded successfully.');
-      setFormData({ employeeId: '', date: moment().format('YYYY-MM-DD'), punchIn: '', punchOut: '' });
+      setFormData({ employeeId: '', date: moment().format('YYYY-MM-DD'), punchIn: '', punchOut: '', mode: 'office' });
       setPage(1);
       fetchAttendances();
     } catch (err) {
@@ -169,6 +171,7 @@ const ManualAttendance = () => {
       punchOut: attendance.punchOut ? moment(attendance.punchOut).format('HH:mm') : '',
       holiday: attendance.holiday || false,
       halfDay: attendance.halfDay || false,
+      mode: attendance.mode || 'office',
     });
     setShowEditModal(true);
   };
@@ -203,6 +206,7 @@ const ManualAttendance = () => {
         punchOut: editForm.punchOut ? `${date}T${editForm.punchOut}:00` : null,
         holiday: editForm.holiday,
         halfDay: editForm.halfDay,
+        mode: editForm.mode,
       };
 
       await axios.put(`${process.env.REACT_APP_API_URL}/attendance/admin/edit/${editingAttendance._id}`, payload, { headers: authHeaders });
@@ -617,9 +621,16 @@ const ManualAttendance = () => {
               <Form.Label>Punch Out</Form.Label>
               <Form.Control type="time" name="punchOut" value={formData.punchOut} onChange={handleChange} />
             </Form.Group>
+            <Form.Group>
+              <Form.Label>Mode</Form.Label>
+              <Form.Select name="mode" value={formData.mode} onChange={handleChange}>
+                <option value="office">Office</option>
+                <option value="wfh">Work From Home</option>
+              </Form.Select>
+            </Form.Group>
           </div>
           <div className="manual-action-row mt-3">
-            <Button type="button" className="manual-secondary" onClick={() => setFormData({ employeeId: '', date: moment().format('YYYY-MM-DD'), punchIn: '', punchOut: '' })}>
+            <Button type="button" className="manual-secondary" onClick={() => setFormData({ employeeId: '', date: moment().format('YYYY-MM-DD'), punchIn: '', punchOut: '', mode: 'office' })}>
               Reset
             </Button>
             <Button type="submit" className="manual-primary" disabled={saving}>
@@ -660,6 +671,7 @@ const ManualAttendance = () => {
                   <th>Holiday</th>
                   <th>Half Day</th>
                   <th>Status</th>
+                  <th>Mode</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -688,6 +700,11 @@ const ManualAttendance = () => {
                     <td><span className={`manual-status ${attendance.holiday ? 'yes' : 'no'}`}>{attendance.holiday ? 'Yes' : 'No'}</span></td>
                     <td><span className={`manual-status ${attendance.halfDay ? 'yes' : 'no'}`}>{attendance.halfDay ? 'Yes' : 'No'}</span></td>
                     <td><span className={`manual-status ${attendance.status || 'pending'}`}>{attendance.status || 'pending'}</span></td>
+                    <td>
+                      <Badge bg={attendance.mode === 'wfh' ? 'info' : 'secondary'}>
+                        {attendance.mode === 'wfh' ? 'WFH' : 'Office'}
+                      </Badge>
+                    </td>
                     <td>
                       <Button type="button" size="sm" className="manual-secondary me-2" onClick={() => handleEdit(attendance)}>Edit</Button>
                       <Button type="button" size="sm" className="manual-danger" onClick={() => handleDelete(attendance._id)}>Delete</Button>
@@ -733,6 +750,15 @@ const ManualAttendance = () => {
               </Col>
               <Col md={6}>
                 <Form.Check type="checkbox" label="Half Day" checked={editForm.halfDay} onChange={(event) => setEditForm({ ...editForm, halfDay: event.target.checked })} />
+              </Col>
+              <Col md={12}>
+                <Form.Group>
+                  <Form.Label>Mode</Form.Label>
+                  <Form.Select value={editForm.mode} onChange={(event) => setEditForm({ ...editForm, mode: event.target.value })}>
+                    <option value="office">Office</option>
+                    <option value="wfh">Work From Home</option>
+                  </Form.Select>
+                </Form.Group>
               </Col>
             </Row>
             <div className="manual-action-row mt-4">
