@@ -67,6 +67,7 @@ const AdminSettings = () => {
       lateCheckInGracePeriod: data.lateCheckInGracePeriod || 15,
       allowEarlyCheckOut: data.allowEarlyCheckOut ?? true,
       earlyCheckOutGracePeriod: data.earlyCheckOutGracePeriod || 15,
+      allowWorkFromHome: data.allowWorkFromHome ?? true,
     });
 
     setLeaveSettings({
@@ -679,6 +680,15 @@ const AdminSettings = () => {
                     label="Allow Early Check-out"
                     checked={attendanceSettings.allowEarlyCheckOut}
                     onChange={(e) => setAttendanceSettings({...attendanceSettings, allowEarlyCheckOut: e.target.checked})}
+                  />
+                </Col>
+                <Col md={6}>
+                  <Form.Check
+                    type="switch"
+                    id="allow-work-from-home"
+                    label="Allow employees to request Work From Home"
+                    checked={attendanceSettings.allowWorkFromHome}
+                    onChange={(e) => setAttendanceSettings({...attendanceSettings, allowWorkFromHome: e.target.checked})}
                   />
                 </Col>
               </Row>

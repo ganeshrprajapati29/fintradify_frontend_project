@@ -624,13 +624,14 @@ const AttendanceTable = ({ isEmployee }) => {
                 <th>Punch Out</th>
                 <th>Hours</th>
                 <th>Status</th>
+                <th>Mode</th>
                 <th>Location</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td className="attendance-empty" colSpan={isEmployee ? 6 : 8}>
+                  <td className="attendance-empty" colSpan={isEmployee ? 7 : 9}>
                     <Spinner animation="border" size="sm" className="me-2" /> Loading attendance...
                   </td>
                 </tr>
@@ -660,12 +661,17 @@ const AttendanceTable = ({ isEmployee }) => {
                     <td>{formatTime(attendance.punchOut)}</td>
                     <td>{getHoursWorked(attendance)}</td>
                     <td>{renderStatus(attendance.status)}</td>
+                    <td>
+                      <Badge bg={attendance.mode === 'wfh' ? 'info' : 'secondary'}>
+                        {attendance.mode === 'wfh' ? 'WFH' : 'Office'}
+                      </Badge>
+                    </td>
                     <td className="attendance-location" title={attendance.locationAddress || ''}>{attendance.locationAddress || '-'}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td className="attendance-empty" colSpan={isEmployee ? 6 : 8}>No attendance records found</td>
+                  <td className="attendance-empty" colSpan={isEmployee ? 7 : 9}>No attendance records found</td>
                 </tr>
               )}
             </tbody>
@@ -685,7 +691,12 @@ const AttendanceTable = ({ isEmployee }) => {
                     <div className="attendance-mobile-date">{formatDate(attendance.date)}</div>
                     {!isEmployee && <div className="text-muted small">{attendance.employee?.name || 'N/A'} ({attendance.employee?.employeeId || 'N/A'})</div>}
                   </div>
-                  {renderStatus(attendance.status)}
+                  <div className="d-flex gap-2 align-items-center">
+                    <Badge bg={attendance.mode === 'wfh' ? 'info' : 'secondary'}>
+                      {attendance.mode === 'wfh' ? 'WFH' : 'Office'}
+                    </Badge>
+                    {renderStatus(attendance.status)}
+                  </div>
                 </div>
                 <div className="attendance-mobile-grid">
                   <div className="attendance-mobile-field"><span>Punch In</span><strong>{formatTime(attendance.punchIn)}</strong></div>

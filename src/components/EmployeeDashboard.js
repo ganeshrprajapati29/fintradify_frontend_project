@@ -25,6 +25,7 @@ import {
 } from 'chart.js';
 import AttendanceTable from './AttendanceTable';
 import LeaveRequest from './LeaveRequest';
+import WFHRequest from './WFHRequest';
 import SalarySlip from './SalarySlip';
 import Profile from './ProfileDisplay';
 import EmployeeProfileEdit from './EmployeeProfileEdit';
@@ -51,6 +52,7 @@ const EmployeeDashboard = () => {
   const [dashboardTasks, setDashboardTasks] = useState([]);
   const [dashboardReimbursements, setDashboardReimbursements] = useState([]);
   const [leaveBalances, setLeaveBalances] = useState(null);
+  const [wfhStatus, setWfhStatus] = useState(null);
   const [error, setError] = useState('');
   const [taskMessage, setTaskMessage] = useState('');
   const [quickTask, setQuickTask] = useState(null);
@@ -137,10 +139,11 @@ const EmployeeDashboard = () => {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const [taskRes, reimbursementRes, leaveRes] = await Promise.allSettled([
+        const [taskRes, reimbursementRes, leaveRes, wfhRes] = await Promise.allSettled([
           axios.get(`${process.env.REACT_APP_API_URL}/tasks/my-tasks`, { headers: authHeaders }),
           axios.get(`${process.env.REACT_APP_API_URL}/reimbursements/my`, { headers: authHeaders }),
           axios.get(`${process.env.REACT_APP_API_URL}/leaves/my-balances`, { headers: authHeaders }),
+          axios.get(`${process.env.REACT_APP_API_URL}/wfh/today-status`, { headers: authHeaders }),
         ]);
 
         if (taskRes.status === 'fulfilled') {
@@ -153,6 +156,10 @@ const EmployeeDashboard = () => {
 
         if (leaveRes.status === 'fulfilled') {
           setLeaveBalances(leaveRes.value.data?.data || leaveRes.value.data || null);
+        }
+
+        if (wfhRes.status === 'fulfilled') {
+          setWfhStatus(wfhRes.value.data || null);
         }
       } catch (err) {
         console.error('Error fetching dashboard widgets:', err);
@@ -382,6 +389,7 @@ const EmployeeDashboard = () => {
     { key: 'attendance-calendar', label: 'Calendar' },
     { key: 'attendance', label: 'Attendance' },
     { key: 'leaves', label: 'Leave Requests' },
+    { key: 'wfh', label: 'Work From Home' },
     { key: 'tasks', label: 'My Tasks' },
     { key: 'salary', label: 'Salary Slips' },
     { key: 'certificates', label: 'Certificates' },
@@ -395,7 +403,7 @@ const EmployeeDashboard = () => {
 
   const navGroups = [
     { title: 'Overview', items: ['profile'] },
-    { title: 'Attendance', items: ['attendance-calendar', 'attendance', 'leaves'] },
+    { title: 'Attendance', items: ['attendance-calendar', 'attendance', 'leaves', 'wfh'] },
     { title: 'Work', items: ['tasks', 'reimbursements'] },
     { title: 'Documents', items: ['salary', 'certificates', 'documents'] },
     { title: 'Account', items: ['notifications', 'settings', 'change-password', 'edit-profile'] },
@@ -409,6 +417,7 @@ const EmployeeDashboard = () => {
       {tab === 'attendance-calendar' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />}
       {tab === 'attendance' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z" />}
       {tab === 'leaves' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5h6m-6 4h6m-7 4h8M5 4h14v16H5z" />}
+      {tab === 'wfh' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7m-9 11v-6h4v6m5-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-8 0H6a1 1 0 01-1-1V10" />}
       {tab === 'tasks' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5h11M9 12h11M9 19h11M4 5l1 1 2-2M4 12l1 1 2-2M4 19l1 1 2-2" />}
       {tab === 'salary' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-2.21 0-4 1.12-4 2.5S9.79 13 12 13s4 1.12 4 2.5S14.21 18 12 18m0-10V6m0 12v2M4 6h16v12H4z" />}
       {tab === 'certificates' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4M7 3h10a2 2 0 012 2v14l-3-2-3 2-3-2-3 2V5a2 2 0 012-2z" />}
@@ -1752,6 +1761,7 @@ const EmployeeDashboard = () => {
                   <div className="employee-hero-actions">
                     <button type="button" className="employee-action-btn" onClick={() => handleTabClick('attendance')}>Attendance</button>
                     <button type="button" className="employee-action-btn" onClick={() => handleTabClick('leaves')}>Apply Leave</button>
+                    <button type="button" className="employee-action-btn" onClick={() => handleTabClick('wfh')}>Work From Home</button>
                     <button type="button" className="employee-action-btn" onClick={() => handleTabClick('tasks')}>My Tasks</button>
                     <button type="button" className="employee-action-btn" onClick={() => handleTabClick('salary')}>Salary Slips</button>
                     <button type="button" className="employee-action-btn" onClick={() => handleTabClick('certificates')}>Certificates</button>
@@ -1784,6 +1794,13 @@ const EmployeeDashboard = () => {
                     <p className="employee-kpi-label">Reimbursements</p>
                     <h2 className="employee-kpi-value">{pendingReimbursements}</h2>
                     <p className="employee-kpi-note">Approved Rs. {approvedReimbursementAmount.toLocaleString('en-IN')}</p>
+                  </div>
+                  <div className="employee-kpi-card" style={{ '--accent': wfhStatus?.isWFH ? '#ddd6fe' : '#bfdbfe' }}>
+                    <p className="employee-kpi-label">Today's Mode</p>
+                    <h2 className="employee-kpi-value">{wfhStatus?.isWFH ? 'Work From Home' : 'Office'}</h2>
+                    <p className="employee-kpi-note">
+                      {wfhStatus?.isWFH ? 'Approved Work From Home for today' : 'Punch in from the office'}
+                    </p>
                   </div>
                 </section>
 
@@ -1941,6 +1958,14 @@ const EmployeeDashboard = () => {
                 <Card.Body>
                   <Card.Title className="animate__animated animate__zoomIn">Leave Requests</Card.Title>
                   <LeaveRequest />
+                </Card.Body>
+              </Card>
+            )}
+            {activeTab === 'wfh' && (
+              <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.3s' }}>
+                <Card.Body>
+                  <Card.Title className="animate__animated animate__zoomIn">Work From Home</Card.Title>
+                  <WFHRequest />
                 </Card.Body>
               </Card>
             )}

@@ -11,6 +11,44 @@ const getRows = (payload) => {
 };
 
 const money = (value) => `Rs. ${Number(value || 0).toLocaleString('en-IN')}`;
+const defaultBenefits = [
+  'Health insurance coverage as per company policy.',
+  'Provident Fund and statutory benefits, wherever applicable.',
+  'Leave, holidays, and reimbursements as per HR policy.',
+  'Performance-linked rewards subject to company and individual performance.',
+].join('\n');
+
+const defaultTerms = '';
+
+const initialFormData = {
+  employeeId: '',
+  position: '',
+  department: '',
+  joiningDate: '',
+  salary: '',
+  compensationType: 'salary',
+  documentType: 'offer',
+  salaryStructureLabel: 'Monthly Salary + Incentives',
+  salaryCondition: 'The variable part of your salary will be based on your performance and targets. Incentives will be reviewed and adjusted quarterly.',
+  reportingManager: '',
+  workLocation: 'Noida, Uttar Pradesh',
+  workingHours: '10:00 AM to 6:00 PM',
+  employmentType: 'Full-time',
+  probationPeriod: '6',
+  noticePeriod: '30',
+  offerValidityDays: '7',
+  logoUrl: '',
+  companyAddress: 'C6, C Block, Sector 7, Noida, Uttar Pradesh 201301',
+  companyEmail: 'support@fintradify.com',
+  companyPhone: '+91 78360 09907',
+  companyWebsite: 'www.fintradify.com',
+  customIntro: '',
+  responsibilities: '',
+  benefits: defaultBenefits,
+  termsMode: 'append',
+  terms: defaultTerms,
+  closingNote: 'Please sign and return a copy of this letter or confirm acceptance over official email. We look forward to welcoming you to the Fintradify team.',
+};
 
 const statusMeta = (status) => {
   const value = String(status || 'draft').toLowerCase();
@@ -23,15 +61,7 @@ const statusMeta = (status) => {
 const OfferLetter = () => {
   const [employees, setEmployees] = useState([]);
   const [letters, setLetters] = useState([]);
-  const [formData, setFormData] = useState({
-    employeeId: '',
-    position: '',
-    department: '',
-    joiningDate: '',
-    salary: '',
-    reportingManager: '',
-    workLocation: 'Noida, Uttar Pradesh',
-  });
+  const [formData, setFormData] = useState(initialFormData);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -105,19 +135,30 @@ const OfferLetter = () => {
     });
   };
 
+  const splitLines = (value) => String(value || '').split(/\r?\n/).map((item) => item.trim().replace(/^[-*]\s*/, '')).filter(Boolean);
+
   const handleGenerate = async (event) => {
     event.preventDefault();
-    if (!formData.employeeId || !formData.position || !formData.department || !formData.joiningDate || !Number(formData.salary)) {
+    if (!formData.employeeId || !formData.position || !formData.department || !formData.joiningDate) {
       setError('Please fill all required fields');
       return;
     }
 
     setSubmitting(true);
     try {
-      const response = await api.post('/offer/generate', { ...formData, salary: Number(formData.salary) });
+      const payload = {
+        ...formData,
+        salary: Number(formData.salary) || 0,
+        probationPeriod: Number(formData.probationPeriod) || 6,
+        noticePeriod: Number(formData.noticePeriod) || 30,
+        offerValidityDays: Number(formData.offerValidityDays) || 7,
+        benefits: splitLines(formData.benefits),
+        terms: splitLines(formData.terms),
+      };
+      const response = await api.post('/offer/generate', payload);
       setSuccess(response.data?.message || 'Offer letter generated and emailed successfully');
       setError('');
-      setFormData({ employeeId: '', position: '', department: '', joiningDate: '', salary: '', reportingManager: '', workLocation: 'Noida, Uttar Pradesh' });
+      setFormData(initialFormData);
       await fetchLetters();
     } catch (err) {
       setSuccess('');
@@ -154,6 +195,13 @@ const OfferLetter = () => {
     }
   };
 
+  const previewName = selectedEmployee?.name || 'Candidate Name';
+  const previewDate = formData.joiningDate ? moment(formData.joiningDate).format('DD MMMM YYYY') : 'Joining Date';
+  const previewCompensation = formData.compensationType === 'unpaid'
+    ? 'unpaid unless separately approved in writing'
+    : `${money(formData.salary)} (${formData.salaryStructureLabel || (formData.compensationType === 'stipend' ? 'Monthly Stipend' : 'Monthly Salary + Incentives')})`;
+  const previewTerms = splitLines(formData.terms).slice(0, 5);
+
   return (
     <div className="doc-page">
       <style>{`
@@ -171,10 +219,17 @@ const OfferLetter = () => {
         .doc-panel { padding:1rem; }
         .doc-panel-head { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1rem; }
         .doc-panel-title { margin:0; font-size:1.05rem; font-weight:900; }
+        .doc-fieldset { margin-top:1rem; padding-top:1rem; border-top:1px solid #e2e8f0; }
+        .doc-fieldset-title { margin:0 0 .75rem; color:#0f172a; font-size:.92rem; font-weight:900; }
         .doc-controls { display:grid; grid-template-columns:minmax(190px,1fr) 150px; gap:.75rem; margin-bottom:1rem; }
         .doc-page .form-label { color:#334155; font-size:.76rem; font-weight:900; text-transform:uppercase; }
         .doc-page .form-control,.doc-page .form-select { border:1px solid #dbe3ef; border-radius:.65rem; color:#0f172a; font-weight:600; min-height:42px; }
+        .doc-page textarea.form-control { min-height:96px; resize:vertical; line-height:1.5; }
         .doc-action-btn { border-radius:.65rem; font-weight:800; min-height:42px; }
+        .doc-template-note { margin:.5rem 0 0; color:#64748b; font-size:.82rem; font-weight:700; }
+        .doc-logo-preview { display:flex; align-items:center; gap:.75rem; padding:.75rem; background:#fff; border:1px dashed #cbd5e1; border-radius:.75rem; min-height:62px; }
+        .doc-logo-preview img { max-width:150px; max-height:42px; object-fit:contain; }
+        .doc-logo-fallback { width:120px; height:38px; display:grid; place-items:center; border-radius:.5rem; background:#e8f4f7; color:#237282; font-weight:900; }
         .doc-preview { display:grid; gap:.5rem; padding:.85rem; margin:1rem 0; background:#f8fafc; border:1px solid #e2e8f0; border-radius:.75rem; }
         .doc-preview-row { display:flex; justify-content:space-between; gap:1rem; color:#64748b; font-weight:700; }
         .doc-preview-row strong { color:#0f172a; text-align:right; }
@@ -187,8 +242,23 @@ const OfferLetter = () => {
         .doc-person strong,.doc-role strong { display:block; color:#0f172a; }
         .doc-person span,.doc-role span,.doc-muted { color:#64748b; font-size:.84rem; font-weight:600; }
         .doc-empty { min-height:220px; display:flex; align-items:center; justify-content:center; text-align:center; padding:1rem; color:#64748b; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:.8rem; font-weight:700; }
+        .offer-preview-wrap { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.75rem; margin:1rem 0; }
+        .offer-preview-sheet { position:relative; aspect-ratio:595/842; overflow:hidden; border:1px solid #dbe3ef; background:#fff center/cover no-repeat; box-shadow:0 12px 26px rgba(15,23,42,.08); }
+        .offer-preview-page1 { background-image:url('/offer-template-page1.jpg'); }
+        .offer-preview-page2 { background-image:url('/offer-template-page2.jpg'); }
+        .offer-preview-clean-main { position:absolute; left:7.5%; top:13.3%; width:84.8%; height:71.8%; background:#fff; }
+        .offer-preview-clean-contact { position:absolute; left:17%; top:68.2%; width:68%; height:14.6%; background:#fff; }
+        .offer-preview-clean-continue { position:absolute; left:9.2%; top:13.3%; width:84%; height:67.9%; background:#fff; }
+        .offer-preview-text { position:absolute; z-index:2; color:#050505; font-family:Arial,Helvetica,sans-serif; line-height:1.2; }
+        .offer-preview-title { left:0; top:15%; width:100%; text-align:center; font-size:1.05rem; font-weight:900; }
+        .offer-preview-body { left:10.6%; top:21.5%; width:78.8%; font-size:.45rem; display:grid; gap:.35rem; }
+        .offer-preview-body strong { font-weight:900; }
+        .offer-preview-list { margin:.15rem 0 0; padding-left:.7rem; display:grid; gap:.12rem; }
+        .offer-preview-final { left:10.3%; top:48.5%; width:78%; font-size:.48rem; }
+        .offer-preview-contact { left:17.4%; top:69.4%; width:62%; font-size:.5rem; display:grid; gap:.72rem; }
         @media(max-width:1180px){ .doc-grid,.doc-hero{grid-template-columns:1fr}.doc-stat-grid{grid-template-columns:repeat(3,minmax(0,1fr))} }
-        @media(max-width:760px){ .doc-controls{grid-template-columns:1fr}.doc-panel-head{align-items:flex-start;flex-direction:column}.doc-table-wrap{overflow-x:auto}.doc-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))} }
+        @media(max-width:1180px){ .offer-preview-wrap{grid-template-columns:repeat(2,minmax(0,1fr))} }
+        @media(max-width:760px){ .doc-controls,.offer-preview-wrap{grid-template-columns:1fr}.doc-panel-head{align-items:flex-start;flex-direction:column}.doc-table-wrap{overflow-x:auto}.doc-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))} }
         @media(max-width:560px){ .doc-stat-grid{grid-template-columns:1fr}.doc-panel,.doc-hero{padding:.85rem}.doc-action-btn{width:100%} }
       `}</style>
 
@@ -221,16 +291,104 @@ const OfferLetter = () => {
               <Col md={6}><Form.Group><Form.Label>Position</Form.Label><Form.Control value={formData.position} onChange={(event) => setFormData({ ...formData, position: event.target.value })} required /></Form.Group></Col>
               <Col md={6}><Form.Group><Form.Label>Department</Form.Label><Form.Control value={formData.department} onChange={(event) => setFormData({ ...formData, department: event.target.value })} required /></Form.Group></Col>
               <Col md={6}><Form.Group><Form.Label>Joining Date</Form.Label><Form.Control type="date" value={formData.joiningDate} onChange={(event) => setFormData({ ...formData, joiningDate: event.target.value })} required /></Form.Group></Col>
-              <Col md={6}><Form.Group><Form.Label>Monthly Salary</Form.Label><Form.Control type="number" min="1" value={formData.salary} onChange={(event) => setFormData({ ...formData, salary: event.target.value })} required /></Form.Group></Col>
+              <Col md={6}><Form.Group><Form.Label>Compensation Amount</Form.Label><Form.Control type="number" min="0" value={formData.salary} onChange={(event) => setFormData({ ...formData, salary: event.target.value })} placeholder="Leave blank or 0 for unpaid internship" /></Form.Group></Col>
               <Col md={6}><Form.Group><Form.Label>Reporting Manager</Form.Label><Form.Control value={formData.reportingManager} onChange={(event) => setFormData({ ...formData, reportingManager: event.target.value })} placeholder="HR Manager" /></Form.Group></Col>
               <Col md={6}><Form.Group><Form.Label>Work Location</Form.Label><Form.Control value={formData.workLocation} onChange={(event) => setFormData({ ...formData, workLocation: event.target.value })} /></Form.Group></Col>
+              <Col md={6}><Form.Group><Form.Label>Working Hours</Form.Label><Form.Control value={formData.workingHours} onChange={(event) => setFormData({ ...formData, workingHours: event.target.value })} /></Form.Group></Col>
             </Row>
+            <div className="doc-fieldset">
+              <h4 className="doc-fieldset-title">Offer controls</h4>
+              <Row className="g-3">
+                <Col md={4}><Form.Group><Form.Label>Document Type</Form.Label><Form.Select value={formData.documentType} onChange={(event) => setFormData({ ...formData, documentType: event.target.value })}><option value="offer">Offer Letter</option><option value="appointment">Appointment Letter</option></Form.Select></Form.Group></Col>
+                <Col md={4}><Form.Group><Form.Label>Compensation Type</Form.Label><Form.Select value={formData.compensationType} onChange={(event) => setFormData({ ...formData, compensationType: event.target.value, salaryStructureLabel: event.target.value === 'stipend' ? 'Monthly Stipend' : event.target.value === 'unpaid' ? 'Unpaid Internship' : formData.salaryStructureLabel })}><option value="salary">Salary</option><option value="stipend">Stipend</option><option value="unpaid">Unpaid / No Salary</option><option value="custom">Custom</option></Form.Select></Form.Group></Col>
+                <Col md={4}><Form.Group><Form.Label>Employment Type</Form.Label><Form.Select value={formData.employmentType} onChange={(event) => setFormData({ ...formData, employmentType: event.target.value })}><option>Full-time</option><option>Internship</option><option>Contract</option><option>Part-time</option><option>Consultant</option></Form.Select></Form.Group></Col>
+                <Col md={4}><Form.Group><Form.Label>Probation Months</Form.Label><Form.Control type="number" min="0" value={formData.probationPeriod} onChange={(event) => setFormData({ ...formData, probationPeriod: event.target.value })} /></Form.Group></Col>
+                <Col md={4}><Form.Group><Form.Label>Notice Days</Form.Label><Form.Control type="number" min="0" value={formData.noticePeriod} onChange={(event) => setFormData({ ...formData, noticePeriod: event.target.value })} /></Form.Group></Col>
+                <Col md={4}><Form.Group><Form.Label>Offer Valid Days</Form.Label><Form.Control type="number" min="1" value={formData.offerValidityDays} onChange={(event) => setFormData({ ...formData, offerValidityDays: event.target.value })} /></Form.Group></Col>
+                <Col md={8}><Form.Group><Form.Label>Salary Structure Label</Form.Label><Form.Control value={formData.salaryStructureLabel} onChange={(event) => setFormData({ ...formData, salaryStructureLabel: event.target.value })} placeholder="Monthly Salary + Incentives" /></Form.Group></Col>
+                <Col xs={12}><Form.Group><Form.Label>Salary Structure Condition</Form.Label><Form.Control as="textarea" value={formData.salaryCondition} onChange={(event) => setFormData({ ...formData, salaryCondition: event.target.value })} placeholder="Variable pay, incentive, deduction, review, or salary confidentiality condition" /></Form.Group></Col>
+              </Row>
+            </div>
+            <div className="doc-fieldset">
+              <h4 className="doc-fieldset-title">Branding and company details</h4>
+              <Row className="g-3">
+                <Col xs={12}><Form.Group><Form.Label>Logo URL</Form.Label><Form.Control value={formData.logoUrl} onChange={(event) => setFormData({ ...formData, logoUrl: event.target.value })} placeholder="Optional public logo URL, default Fintradify logo used" /><p className="doc-template-note">Leave blank to use the uploaded Fintradify logo from backend assets.</p></Form.Group></Col>
+                <Col xs={12}>
+                  <div className="doc-logo-preview">
+                    {formData.logoUrl ? <img src={formData.logoUrl} alt="Offer logo preview" onError={(event) => { event.currentTarget.style.display = 'none'; }} /> : <img src="/fintradify-logo.png" alt="Fintradify logo preview" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
+                    <span className="doc-muted">PDF header logo preview</span>
+                  </div>
+                </Col>
+                <Col xs={12}><Form.Group><Form.Label>Company Address</Form.Label><Form.Control value={formData.companyAddress} onChange={(event) => setFormData({ ...formData, companyAddress: event.target.value })} /></Form.Group></Col>
+                <Col md={4}><Form.Group><Form.Label>Company Email</Form.Label><Form.Control value={formData.companyEmail} onChange={(event) => setFormData({ ...formData, companyEmail: event.target.value })} /></Form.Group></Col>
+                <Col md={4}><Form.Group><Form.Label>Company Phone</Form.Label><Form.Control value={formData.companyPhone} onChange={(event) => setFormData({ ...formData, companyPhone: event.target.value })} /></Form.Group></Col>
+                <Col md={4}><Form.Group><Form.Label>Website</Form.Label><Form.Control value={formData.companyWebsite} onChange={(event) => setFormData({ ...formData, companyWebsite: event.target.value })} /></Form.Group></Col>
+              </Row>
+            </div>
+            <div className="doc-fieldset">
+              <h4 className="doc-fieldset-title">Letter content</h4>
+              <Row className="g-3">
+                <Col xs={12}><Form.Group><Form.Label>Custom Intro</Form.Label><Form.Control as="textarea" value={formData.customIntro} onChange={(event) => setFormData({ ...formData, customIntro: event.target.value })} placeholder="Optional opening paragraph; leave blank for default offer paragraph" /></Form.Group></Col>
+                <Col xs={12}><Form.Group><Form.Label>Role Expectations</Form.Label><Form.Control as="textarea" value={formData.responsibilities} onChange={(event) => setFormData({ ...formData, responsibilities: event.target.value })} placeholder="Department specific duties, reporting cadence, working hours, or goals" /></Form.Group></Col>
+                <Col xs={12}><Form.Group><Form.Label>Benefits</Form.Label><Form.Control as="textarea" rows={5} value={formData.benefits} onChange={(event) => setFormData({ ...formData, benefits: event.target.value })} placeholder="One benefit per line" /></Form.Group></Col>
+                <Col md={6}><Form.Group><Form.Label>Terms Mode</Form.Label><Form.Select value={formData.termsMode} onChange={(event) => setFormData({ ...formData, termsMode: event.target.value })}><option value="append">Append to standard terms</option><option value="replace">Replace standard terms</option></Form.Select></Form.Group></Col>
+                <Col xs={12}><Form.Group><Form.Label>Custom Terms & Conditions</Form.Label><Form.Control as="textarea" rows={10} value={formData.terms} onChange={(event) => setFormData({ ...formData, terms: event.target.value })} placeholder="One term per line. Add as many as needed; PDF pages continue automatically." /><p className="doc-template-note">Append mode keeps the standard appointment terms and adds your custom points after them.</p></Form.Group></Col>
+                <Col xs={12}><Form.Group><Form.Label>Closing Note</Form.Label><Form.Control as="textarea" value={formData.closingNote} onChange={(event) => setFormData({ ...formData, closingNote: event.target.value })} /></Form.Group></Col>
+              </Row>
+            </div>
             <div className="doc-preview">
               <div className="doc-preview-row"><span>Employee</span><strong>{selectedEmployee ? `${selectedEmployee.name} (${selectedEmployee.employeeId})` : 'Not selected'}</strong></div>
               <div className="doc-preview-row"><span>Position</span><strong>{formData.position || 'N/A'}</strong></div>
-              <div className="doc-preview-row"><span>Salary</span><strong>{money(formData.salary)}</strong></div>
+              <div className="doc-preview-row"><span>Compensation</span><strong>{formData.compensationType === 'unpaid' ? 'Unpaid / No Salary' : money(formData.salary)}</strong></div>
+              <div className="doc-preview-row"><span>Document</span><strong>{formData.documentType === 'appointment' ? 'Appointment Letter' : 'Offer Letter'}</strong></div>
+              <div className="doc-preview-row"><span>Template</span><strong>A4 Modern Blue Template</strong></div>
+              <div className="doc-preview-row"><span>Terms</span><strong>{splitLines(formData.terms).length} custom points</strong></div>
             </div>
-            <Button className="doc-action-btn" type="submit" disabled={submitting || loading}>{submitting ? 'Generating...' : 'Generate Offer Letter'}</Button>
+            <div className="offer-preview-wrap">
+              <div className="offer-preview-sheet offer-preview-page1">
+                <div className="offer-preview-clean-main" />
+                <div className="offer-preview-text offer-preview-title">{formData.documentType === 'appointment' ? 'APPOINTMENT LETTER' : 'OFFER LETTER'}</div>
+                <div className="offer-preview-text offer-preview-body">
+                  <strong>Date: {moment().format('DD MMMM YYYY')}</strong>
+                  <div><strong>To, Mr. {previewName}</strong><br />{selectedEmployee?.address || 'Address not provided'}</div>
+                  <div>Dear Mr. {previewName}</div>
+                  <div>We are pleased to {formData.documentType === 'appointment' ? 'appoint you with' : 'offer you employment with'} <strong>FinTradify</strong>, for the position of <strong>{formData.position || 'Role'}</strong>.</div>
+                  <div>Your employment will be effective from <strong>{previewDate}</strong>. You will be assigned <strong>Employee ID: {selectedEmployee?.employeeId || 'N/A'}</strong>.</div>
+                  <div>You will report directly to <strong>{formData.reportingManager || 'HR Manager'}</strong>. Compensation: <strong>{previewCompensation}</strong>.</div>
+                  <div>Your working hours will be from <strong>{formData.workingHours || '10:00 AM to 6:00 PM'}</strong>.</div>
+                  <ul className="offer-preview-list">
+                    {(previewTerms.length ? previewTerms : [
+                      `Your appointment will be effective from ${previewDate}`,
+                      'You are expected to perform your duties with dedication and professionalism.',
+                      'Company terms and policies will apply as amended from time to time.',
+                    ]).map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}
+                  </ul>
+                </div>
+              </div>
+              <div className="offer-preview-sheet offer-preview-page2">
+                <div className="offer-preview-clean-continue" />
+                <div className="offer-preview-text offer-preview-body" style={{ top: '15%' }}>
+                  <ul className="offer-preview-list">
+                    {(previewTerms.length ? previewTerms : [
+                      'Continued terms and conditions flow here.',
+                      'Extra custom terms continue onto clean template pages.',
+                      'Signature and contact section stays only on the final page.',
+                    ]).map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}
+                  </ul>
+                </div>
+              </div>
+              <div className="offer-preview-sheet offer-preview-page2">
+                <div className="offer-preview-clean-contact" />
+                <div className="offer-preview-text offer-preview-final">Wishing you all the best {String(previewName).split(' ')[0] || 'Candidate'},</div>
+                <div className="offer-preview-text offer-preview-contact">
+                  <div>{formData.companyPhone || '8882385802'}</div>
+                  <div>{formData.companyEmail || 'support@fintradify.com'}</div>
+                  <div>{formData.companyAddress || 'Office no-105, C-6, Sector 7, Noida'}</div>
+                  <div>{formData.companyWebsite || 'https://fintradify.com/'}</div>
+                </div>
+              </div>
+            </div>
+            <Button className="doc-action-btn" type="submit" disabled={submitting || loading}>{submitting ? 'Generating...' : `Generate ${formData.documentType === 'appointment' ? 'Appointment' : 'Offer'} Letter`}</Button>
           </Form>
         </div>
 

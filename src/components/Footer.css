@@ -87,13 +87,13 @@
 .public-footer__brand-copy strong {
   color: #0f172a;
   font-size: 20px;
-  font-weight: 950;
+  font-weight: 800;
 }
 
 .public-footer__brand-copy small {
   color: #0e7490;
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -123,7 +123,7 @@
   padding: 0 14px;
   border-radius: 8px;
   text-decoration: none;
-  font-weight: 900;
+  font-weight: 800;
   font-size: 14px;
   transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
 }
@@ -150,7 +150,7 @@
   margin: 0 0 16px;
   color: #0f172a;
   font-size: 13px;
-  font-weight: 950;
+  font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
