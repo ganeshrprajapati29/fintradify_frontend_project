@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Button, Card, Col, Form, Row } from 'react-bootstrap';
 import api from '../utils/axios';
+import EmployeeLocationManager from './EmployeeLocationManager';
 
 const DEFAULTS = {
   officeLatitude: 28.595339,
@@ -223,6 +224,8 @@ const AdminAttendanceRadius = () => {
           </Form>
         )}
       </Card>
+
+      {!loading && <EmployeeLocationManager office={form} />}
     </div>
   );
 };

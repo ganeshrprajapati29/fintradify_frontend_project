@@ -133,9 +133,35 @@ const AttendanceTable = ({ isEmployee }) => {
     setSuccess('');
   };
 
+  const getBrowserLocation = () => new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('Location is not supported by this browser.'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve(pos.coords),
+      (geoError) => reject(new Error(geoError.code === 1
+        ? 'Location permission is required to punch in or out. Please allow location access in your browser.'
+        : 'Could not get your location. Please turn on GPS/location and try again.')),
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+    );
+  });
+
   const handlePunch = async (type) => {
     try {
-      const response = await api.post('/attendance/punch', { type });
+      let coords;
+      try {
+        coords = await getBrowserLocation();
+      } catch (geoError) {
+        setSuccess('');
+        setError(geoError.message);
+        return;
+      }
+      const response = await api.post('/attendance/punch', {
+        type,
+        location: { lat: coords.latitude, lng: coords.longitude, accuracy: coords.accuracy },
+        address: `${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`,
+      });
       setSuccess(response.data.message || `Punch ${type} recorded successfully`);
       setError('');
       if (type === 'in' && response.data.popupMessage) {

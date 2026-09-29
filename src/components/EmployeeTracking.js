@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { Alert, Button, Table } from 'react-bootstrap';
-import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
+import { Circle, MapContainer, Marker, Popup, TileLayer, Tooltip, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -43,6 +43,24 @@ const getEmployeeLocation = (employee) => {
   return [latitude, longitude];
 };
 
+const zoneLabel = (employee) => {
+  const zone = employee.geofence;
+  if (!zone) return 'Not set';
+  return `${zone.label || (zone.source === 'employee' ? 'Assigned location' : 'Office')} · ${Math.round(zone.radiusMeters)} m`;
+};
+
+const zoneStatus = (employee) => {
+  if (employee.insideZone === true) return { cls: 'located', text: `Inside (${employee.distanceFromZone} m)` };
+  if (employee.insideZone === false) return { cls: 'outside', text: `Outside (${formatDistance(employee.distanceFromZone)})` };
+  return { cls: 'missing', text: 'No GPS' };
+};
+
+const formatDistance = (meters) => {
+  const value = Number(meters);
+  if (!Number.isFinite(value)) return 'N/A';
+  return value >= 1000 ? `${(value / 1000).toFixed(1)} km` : `${Math.round(value)} m`;
+};
+
 const EmployeeTracking = () => {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -70,7 +88,7 @@ const EmployeeTracking = () => {
 
   useEffect(() => {
     fetchTracking();
-    const interval = setInterval(fetchTracking, 60000);
+    const interval = setInterval(fetchTracking, 30000);
 
     const handleAttendanceUpdate = () => fetchTracking();
     window.addEventListener('attendanceUpdated', handleAttendanceUpdate);
@@ -115,7 +133,7 @@ const EmployeeTracking = () => {
 
   const createCustomIcon = (employee) => {
     const hasLocation = Boolean(getEmployeeLocation(employee));
-    const fill = !hasLocation ? '#94a3b8' : employee.isActive ? '#10b981' : '#2563eb';
+    const fill = !hasLocation ? '#94a3b8' : employee.insideZone === false ? '#dc2626' : employee.isActive ? '#10b981' : '#2563eb';
     const label = (employee.name || 'E').slice(0, 1).toUpperCase();
     const svgString = `
       <svg width="44" height="52" viewBox="0 0 44 52" xmlns="http://www.w3.org/2000/svg">
@@ -144,7 +162,8 @@ const EmployeeTracking = () => {
           (filter === 'active' && employee.isActive) ||
           (filter === 'inactive' && !employee.isActive) ||
           (filter === 'located' && hasLocation) ||
-          (filter === 'missing' && !hasLocation);
+          (filter === 'missing' && !hasLocation) ||
+          (filter === 'outside' && employee.insideZone === false);
 
         const matchesQuery = !normalizedQuery || [
           employee.employeeId,
@@ -172,6 +191,7 @@ const EmployeeTracking = () => {
     active: employees.filter((employee) => employee.isActive).length,
     located: employees.filter((employee) => getEmployeeLocation(employee)).length,
     missing: employees.filter((employee) => !getEmployeeLocation(employee)).length,
+    outside: employees.filter((employee) => employee.insideZone === false).length,
     tasks: employees.reduce((sum, employee) => sum + (employee.todaysTasks?.length || 0), 0),
     hours: employees.reduce((sum, employee) => sum + (Number(employee.hoursWorked) || 0), 0),
   };
@@ -386,6 +406,11 @@ const EmployeeTracking = () => {
             color: #92400e;
             background: #fef3c7;
           }
+          .tracking-status.outside {
+            color: #b91c1c;
+            background: #fee2e2;
+            border-color: #fecaca;
+          }
           .tracking-status.stale {
             color: #b91c1c;
             background: #fee2e2;
@@ -492,7 +517,7 @@ const EmployeeTracking = () => {
         <div className="tracking-kpi-card" style={{ '--accent': '#bae6fd' }}>
           <p className="tracking-kpi-label">Located</p>
           <h4 className="tracking-kpi-value">{stats.located}</h4>
-          <p className="tracking-kpi-note">{stats.missing} missing GPS</p>
+          <p className="tracking-kpi-note">{stats.missing} missing GPS · {stats.outside} outside area</p>
         </div>
         <div className="tracking-kpi-card" style={{ '--accent': '#fed7aa' }}>
           <p className="tracking-kpi-label">Hours</p>
@@ -520,6 +545,7 @@ const EmployeeTracking = () => {
             ['inactive', 'Not Punched'],
             ['located', 'Located'],
             ['missing', 'No GPS'],
+            ['outside', 'Outside Area'],
           ].map(([key, label]) => (
             <button key={key} type="button" className={`tracking-filter-btn ${filter === key ? 'active' : ''}`} onClick={() => setFilter(key)}>
               {label}
@@ -547,6 +573,29 @@ const EmployeeTracking = () => {
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 />
                 <MapBounds employees={locatedEmployees} />
+                {Object.values(filteredEmployees.reduce((zones, employee) => {
+                  const zone = employee.geofence;
+                  if (!zone || !Number.isFinite(Number(zone.latitude)) || !Number.isFinite(Number(zone.longitude))) return zones;
+                  const key = `${zone.latitude},${zone.longitude},${zone.radiusMeters}`;
+                  zones[key] = zones[key] || { ...zone, key, names: [] };
+                  zones[key].names.push(employee.name);
+                  return zones;
+                }, {})).map((zone) => (
+                  <Circle
+                    key={zone.key}
+                    center={[Number(zone.latitude), Number(zone.longitude)]}
+                    radius={Number(zone.radiusMeters)}
+                    pathOptions={{
+                      color: zone.source === 'employee' ? '#7c3aed' : '#0a1f8f',
+                      fillColor: zone.source === 'employee' ? '#7c3aed' : '#0a1f8f',
+                      fillOpacity: 0.08,
+                      weight: 2,
+                      dashArray: zone.source === 'employee' ? '6 6' : undefined,
+                    }}
+                  >
+                    <Tooltip>{zone.label} · {Math.round(zone.radiusMeters)} m · {zone.names.length} employee(s)</Tooltip>
+                  </Circle>
+                ))}
                 {locatedEmployees.map((employee) => {
                   const location = getEmployeeLocation(employee);
                   const meta = getLocationMeta(employee);
@@ -568,10 +617,13 @@ const EmployeeTracking = () => {
                           <div className="mt-2 d-flex gap-2 flex-wrap">
                             <span className={`tracking-status ${employee.isActive ? 'active' : 'inactive'}`}>{employee.isActive ? 'Punched in' : 'Not punched'}</span>
                             <span className={`tracking-status ${age !== null && age > 30 ? 'stale' : 'located'}`}>{age === null ? 'Saved GPS' : `${age} min ago`}</span>
+                            <span className={`tracking-status ${zoneStatus(employee).cls}`}>{zoneStatus(employee).text}</span>
                           </div>
                           <div className="mt-2 small">
                             <div><strong>ID:</strong> {employee.employeeId || 'N/A'}</div>
                             <div><strong>Team:</strong> {employee.team || employee.department || 'N/A'}</div>
+                            <div><strong>Punch area:</strong> {zoneLabel(employee)}</div>
+                            {meta.address && <div><strong>Address:</strong> {meta.address}</div>}
                             <div><strong>Hours:</strong> {(Number(employee.hoursWorked) || 0).toFixed(2)} hrs</div>
                             <div><strong>Accuracy:</strong> {meta.accuracy ? `${Math.round(meta.accuracy)} m` : 'N/A'}</div>
                             <div><strong>Coordinates:</strong> {location[0].toFixed(5)}, {location[1].toFixed(5)}</div>
@@ -610,6 +662,7 @@ const EmployeeTracking = () => {
                     <th>Team</th>
                     <th>Attendance</th>
                     <th>GPS</th>
+                    <th>Punch Area</th>
                     <th>Coordinates</th>
                     <th>Accuracy</th>
                     <th>Punch In</th>
@@ -641,6 +694,10 @@ const EmployeeTracking = () => {
                         <td>{employee.team || employee.department || 'N/A'}</td>
                         <td><span className={`tracking-status ${employee.isActive ? 'active' : 'inactive'}`}>{employee.isActive ? 'Punched in' : 'Not punched'}</span></td>
                         <td><span className={`tracking-status ${location ? 'located' : 'missing'}`}>{location ? meta.source : 'No GPS'}</span></td>
+                        <td>
+                          <div className="small fw-semibold">{zoneLabel(employee)}</div>
+                          <span className={`tracking-status ${zoneStatus(employee).cls}`}>{zoneStatus(employee).text}</span>
+                        </td>
                         <td className="tracking-location-text">{location ? `${location[0].toFixed(5)}, ${location[1].toFixed(5)}` : 'N/A'}</td>
                         <td>{meta.accuracy ? `${Math.round(meta.accuracy)} m` : 'N/A'}</td>
                         <td>{formatTime(employee.punchIn)}</td>

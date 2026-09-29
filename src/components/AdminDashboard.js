@@ -96,7 +96,7 @@ const TAB_LABELS = {
   leaves: 'Leave Requests',
   'paid-leaves': 'Paid Leaves',
   wfh: 'Work From Home',
-  'attendance-radius': 'Attendance Radius',
+  'attendance-radius': 'Attendance Locations',
   'monthly-performance': 'Monthly Performance',
   tasks: 'Tasks',
   salary: 'Salary Slips',
