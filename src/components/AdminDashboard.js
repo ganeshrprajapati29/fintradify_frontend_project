@@ -89,7 +89,7 @@ const TAB_LABELS = {
   'block-employees': 'Block Employees',
   'unblock-employees': 'Unblock Employees',
   teams: 'Teams',
-  tracking: 'Tracking',
+  tracking: 'Live Tracking',
   attendance: 'Attendance',
   'manual-attendance': 'Manual Attendance',
   'active-attendance': 'Active Attendance',

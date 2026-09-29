@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { Alert, Button, Table } from 'react-bootstrap';
-import { Circle, MapContainer, Marker, Popup, TileLayer, Tooltip, useMap } from 'react-leaflet';
+import { Circle, CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, Tooltip, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -12,13 +12,16 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-const MapBounds = ({ employees }) => {
+const MapBounds = ({ employees, fitKey, routePoints }) => {
   const map = useMap();
+  const lastKey = useRef(null);
 
   useEffect(() => {
-    const points = employees
-      .map((employee) => getEmployeeLocation(employee))
-      .filter(Boolean);
+    if (lastKey.current === fitKey) return;
+    lastKey.current = fitKey;
+    const points = routePoints && routePoints.length
+      ? routePoints
+      : employees.map((employee) => getEmployeeLocation(employee)).filter(Boolean);
 
     if (points.length === 1) {
       map.setView(points[0], 15);
@@ -28,9 +31,18 @@ const MapBounds = ({ employees }) => {
     if (points.length > 1) {
       map.fitBounds(points, { padding: [36, 36], maxZoom: 15 });
     }
-  }, [employees, map]);
+  }, [employees, map, fitKey, routePoints]);
 
   return null;
+};
+
+const googleMapsUrl = (lat, lng) => `https://www.google.com/maps?q=${lat},${lng}`;
+
+const formatClock = (value) => {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
 };
 
 const getEmployeeLocation = (employee) => {
@@ -69,28 +81,71 @@ const EmployeeTracking = () => {
   const [sortBy, setSortBy] = useState('updated');
   const [query, setQuery] = useState('');
   const [view, setView] = useState('map');
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
+  const [route, setRoute] = useState(null);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [routeError, setRouteError] = useState('');
+  const selectedRef = useRef(null);
 
-  const fetchTracking = async () => {
-    setLoading(true);
+  const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` });
+
+  const fetchRoute = async (employeeId, silent = false) => {
+    if (!employeeId) return;
+    if (!silent) setRouteLoading(true);
     try {
-      const res = await axios.get(`${process.env.REACT_APP_API_URL}/tracking`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      });
+      const res = await axios.get(`${process.env.REACT_APP_API_URL}/tracking/route/${employeeId}`, { headers: authHeaders() });
+      if (selectedRef.current === employeeId) {
+        setRoute(res.data || null);
+        setRouteError('');
+      }
+    } catch (err) {
+      if (selectedRef.current === employeeId) setRouteError(err.response?.data?.message || 'Failed to load route');
+    } finally {
+      if (!silent) setRouteLoading(false);
+    }
+  };
+
+  const openRoute = (employeeId) => {
+    selectedRef.current = employeeId;
+    setSelectedId(employeeId);
+    setRoute(null);
+    setView('map');
+    fetchRoute(employeeId);
+  };
+
+  const closeRoute = () => {
+    selectedRef.current = null;
+    setSelectedId(null);
+    setRoute(null);
+    setRouteError('');
+  };
+
+  // Initial load shows the loader; live refreshes update quietly so the map stays put.
+  const fetchTracking = async (silent = false) => {
+    if (silent) setRefreshing(true);
+    else setLoading(true);
+    try {
+      const res = await axios.get(`${process.env.REACT_APP_API_URL}/tracking`, { headers: authHeaders() });
       setEmployees(Array.isArray(res.data?.data) ? res.data.data : []);
+      setLastRefreshed(new Date());
       setError('');
+      if (selectedRef.current) fetchRoute(selectedRef.current, true);
     } catch (err) {
       console.error('Error fetching tracking:', err);
       setError(err.response?.data?.message || 'Failed to fetch tracking data');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
   useEffect(() => {
     fetchTracking();
-    const interval = setInterval(fetchTracking, 30000);
+    const interval = setInterval(() => fetchTracking(true), 20000);
 
-    const handleAttendanceUpdate = () => fetchTracking();
+    const handleAttendanceUpdate = () => fetchTracking(true);
     window.addEventListener('attendanceUpdated', handleAttendanceUpdate);
 
     return () => {
@@ -186,12 +241,14 @@ const EmployeeTracking = () => {
   }, [employees, filter, query, sortBy]);
 
   const locatedEmployees = filteredEmployees.filter((employee) => getEmployeeLocation(employee));
+  const routePoints = (route?.route || []).map((p) => [p.latitude, p.longitude]);
   const stats = {
     total: employees.length,
     active: employees.filter((employee) => employee.isActive).length,
     located: employees.filter((employee) => getEmployeeLocation(employee)).length,
     missing: employees.filter((employee) => !getEmployeeLocation(employee)).length,
     outside: employees.filter((employee) => employee.insideZone === false).length,
+    live: employees.filter((employee) => employee.isLive).length,
     tasks: employees.reduce((sum, employee) => sum + (employee.todaysTasks?.length || 0), 0),
     hours: employees.reduce((sum, employee) => sum + (Number(employee.hoursWorked) || 0), 0),
   };
@@ -406,6 +463,54 @@ const EmployeeTracking = () => {
             color: #92400e;
             background: #fef3c7;
           }
+          .tracking-live-dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: #16a34a;
+            animation: tracking-pulse 1.6s infinite;
+            margin-right: 4px;
+          }
+          @keyframes tracking-pulse {
+            0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.55); }
+            70% { box-shadow: 0 0 0 9px rgba(22, 163, 74, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
+          }
+          .tracking-route-panel {
+            margin-top: 14px;
+            padding: 14px;
+            border: 1px solid #e6e9f2;
+            border-radius: 14px;
+            background: #ffffff;
+          }
+          .tracking-timeline {
+            margin-top: 10px;
+            max-height: 260px;
+            overflow-y: auto;
+            display: grid;
+            gap: 6px;
+          }
+          .tracking-timeline-row {
+            display: grid;
+            grid-template-columns: 70px 1fr auto;
+            gap: 10px;
+            align-items: center;
+            font-size: 0.85rem;
+            padding: 6px 8px;
+            border-radius: 8px;
+            background: #f5f7fb;
+          }
+          .tracking-timeline-time {
+            font-weight: 700;
+            color: #0a1f8f;
+          }
+          .tracking-timeline-place {
+            color: #334155;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
           .tracking-status.outside {
             color: #b91c1c;
             background: #fee2e2;
@@ -494,10 +599,13 @@ const EmployeeTracking = () => {
         <div>
           <p className="tracking-eyebrow">Live employee tracking</p>
           <h3 className="tracking-title">Location Monitor</h3>
-          <p className="tracking-subtitle">Track every active employee's latest GPS location, attendance status, tasks, and last update.</p>
+          <p className="tracking-subtitle">See where every employee is right now, whether they are inside their punch area, and today's route. Auto-refreshes every 20 seconds.</p>
+          <p className="tracking-subtitle mb-0">
+            <span className="tracking-live-dot" /> {stats.live} live now · last updated {lastRefreshed ? lastRefreshed.toLocaleTimeString('en-IN') : '—'}
+          </p>
         </div>
-        <Button type="button" className="tracking-action" onClick={fetchTracking} disabled={loading}>
-          {loading ? 'Refreshing...' : 'Refresh locations'}
+        <Button type="button" className="tracking-action" onClick={() => fetchTracking(true)} disabled={loading || refreshing}>
+          {loading || refreshing ? 'Refreshing...' : 'Refresh now'}
         </Button>
       </section>
 
@@ -572,7 +680,26 @@ const EmployeeTracking = () => {
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 />
-                <MapBounds employees={locatedEmployees} />
+                <MapBounds
+                  employees={locatedEmployees}
+                  routePoints={routePoints}
+                  fitKey={`${filter}|${query}|${locatedEmployees.length > 0}|${selectedId || ''}|${routePoints.length ? 'route' : ''}`}
+                />
+                {routePoints.length > 1 && (
+                  <Polyline positions={routePoints} pathOptions={{ color: '#d0142a', weight: 4, opacity: 0.8 }} />
+                )}
+                {routePoints.length > 0 && (
+                  <>
+                    <CircleMarker center={routePoints[0]} radius={7} pathOptions={{ color: '#ffffff', weight: 2, fillColor: '#16a34a', fillOpacity: 1 }}>
+                      <Tooltip>Start · {formatClock(route.route[0].timestamp)}</Tooltip>
+                    </CircleMarker>
+                    {route.route.slice(1, -1).map((p) => (
+                      <CircleMarker key={p.sequence} center={[p.latitude, p.longitude]} radius={3} pathOptions={{ color: '#d0142a', fillColor: '#d0142a', fillOpacity: 0.9, weight: 1 }}>
+                        <Tooltip>{formatClock(p.timestamp)}</Tooltip>
+                      </CircleMarker>
+                    ))}
+                  </>
+                )}
                 {Object.values(filteredEmployees.reduce((zones, employee) => {
                   const zone = employee.geofence;
                   if (!zone || !Number.isFinite(Number(zone.latitude)) || !Number.isFinite(Number(zone.longitude))) return zones;
@@ -629,6 +756,10 @@ const EmployeeTracking = () => {
                             <div><strong>Coordinates:</strong> {location[0].toFixed(5)}, {location[1].toFixed(5)}</div>
                             <div><strong>Updated:</strong> {formatTime(meta.timestamp)}</div>
                           </div>
+                          <div className="mt-2 d-flex gap-2 flex-wrap">
+                            <button type="button" className="tracking-filter-btn active" onClick={() => openRoute(employee._id)}>Today's route</button>
+                            <a className="tracking-filter-btn" href={googleMapsUrl(location[0], location[1])} target="_blank" rel="noopener noreferrer">Google Maps</a>
+                          </div>
                         </div>
                       </Popup>
                     </Marker>
@@ -637,7 +768,39 @@ const EmployeeTracking = () => {
               </MapContainer>
             </div>
           ) : (
-            <div className="tracking-empty">No real GPS locations available yet. Employees need to allow location permission from their portal.</div>
+            <div className="tracking-empty">No live GPS locations yet. Locations appear when employees punch in from the app or keep the employee portal open with location allowed.</div>
+          )}
+          {selectedId && (
+            <div className="tracking-route-panel">
+              <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>
+                  <strong>{route?.employee?.name || employees.find((e) => e._id === selectedId)?.name || 'Employee'} · today's route</strong>
+                  <div className="small text-muted">
+                    {routeLoading ? 'Loading route...' : route
+                      ? `${route.totalPoints} points · ${(route.totalDistance / 1000).toFixed(2)} km · ${formatClock(route.firstSeen)} – ${formatClock(route.lastSeen)}`
+                      : ''}
+                  </div>
+                </div>
+                <button type="button" className="tracking-filter-btn" onClick={closeRoute}>Close route</button>
+              </div>
+              {routeError && <Alert variant="danger" className="mt-2 mb-0">{routeError}</Alert>}
+              {route && !route.totalPoints && !routeLoading && (
+                <div className="small text-muted mt-2">No locations recorded for this employee today.</div>
+              )}
+              {route?.totalPoints > 0 && (
+                <div className="tracking-timeline">
+                  {[...route.route].reverse().slice(0, 25).map((p) => (
+                    <div key={p.sequence} className="tracking-timeline-row">
+                      <span className="tracking-timeline-time">{formatClock(p.timestamp)}</span>
+                      <span className="tracking-timeline-place">
+                        {p.address || `${Number(p.latitude).toFixed(5)}, ${Number(p.longitude).toFixed(5)}`}
+                      </span>
+                      <a href={googleMapsUrl(p.latitude, p.longitude)} target="_blank" rel="noopener noreferrer">Map</a>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </section>
       ) : (
@@ -670,6 +833,7 @@ const EmployeeTracking = () => {
                     <th>Hours</th>
                     <th>Tasks</th>
                     <th>Last Location</th>
+                    <th>Route</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -704,7 +868,13 @@ const EmployeeTracking = () => {
                         <td>{formatTime(employee.punchOut)}</td>
                         <td>{(Number(employee.hoursWorked) || 0).toFixed(2)} hrs</td>
                         <td>{employee.todaysTasks?.length || 0}</td>
-                        <td>{age === null ? formatTime(meta.timestamp) : `${age} min ago`}</td>
+                        <td>
+                          {age === null ? formatTime(meta.timestamp) : `${age} min ago`}
+                          {employee.isLive && <span className="tracking-status located ms-1">Live</span>}
+                        </td>
+                        <td>
+                          <button type="button" className="tracking-filter-btn" onClick={() => openRoute(employee._id)}>View</button>
+                        </td>
                       </tr>
                     );
                   })}
