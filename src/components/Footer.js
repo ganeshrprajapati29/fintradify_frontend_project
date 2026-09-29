@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Modal } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
-import { FaArrowRight, FaEnvelope, FaGlobe, FaGooglePlay, FaMapMarkerAlt, FaPhone } from 'react-icons/fa';
+import { FaArrowRight, FaEnvelope, FaGlobe, FaMapMarkerAlt, FaMobileAlt, FaPhone } from 'react-icons/fa';
 import { usePublicData } from '../contexts/PublicDataContext';
 import './Footer.css';
 
@@ -41,6 +42,7 @@ const Footer = ({ darkMode = false }) => {
   const { siteData } = usePublicData();
   const brand = siteData.brand;
   const logoSrc = brand.logo || '/aerowheels-logo.png';
+  const [showAppNotice, setShowAppNotice] = useState(false);
 
   return (
     <footer
@@ -60,10 +62,10 @@ const Footer = ({ darkMode = false }) => {
           </Link>
           <p>{brand.tagline}</p>
           <div className="public-footer__actions">
-            <a className="public-footer__store" href={brand.appUrl} target="_blank" rel="noopener noreferrer">
-              <FaGooglePlay />
-              <span>Google Play</span>
-            </a>
+            <button type="button" className="public-footer__store" onClick={() => setShowAppNotice(true)}>
+              <FaMobileAlt />
+              <span>Aerowheels HR App</span>
+            </button>
             <Link className="public-footer__cta" to="/verify-certificate">
               Find Employee <FaArrowRight />
             </Link>
@@ -96,6 +98,16 @@ const Footer = ({ darkMode = false }) => {
           ))}
         </div>
       </div>
+
+      <Modal show={showAppNotice} onHide={() => setShowAppNotice(false)} centered size="sm" aria-labelledby="app-coming-soon-title">
+        <Modal.Body className="public-footer__app-modal">
+          <img src="/aerowheels-mark.png" alt="Aerowheels" className="public-footer__app-modal-logo" />
+          <h3 id="app-coming-soon-title">Aerowheels HR App</h3>
+          <span className="public-footer__app-modal-badge">Coming soon</span>
+          <p>Our mobile app for attendance, leave, tasks and payslips is launching soon. Until then, sign in on this website.</p>
+          <button type="button" className="public-footer__cta" onClick={() => setShowAppNotice(false)}>Got it</button>
+        </Modal.Body>
+      </Modal>
     </footer>
   );
 };

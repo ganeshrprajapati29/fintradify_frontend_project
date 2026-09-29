@@ -11,7 +11,6 @@ const brand = {
   website: 'https://www.aerowheels.co.in/',
   logo: '/aerowheels-logo.png',
   mark: '/aerowheels-mark.png',
-  appUrl: 'https://play.google.com/store/apps/details?id=com.fintradify.hrportal',
 };
 
 export default brand;
