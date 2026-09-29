@@ -13,7 +13,7 @@ export const useSettings = () => {
 
 export const SettingsProvider = ({ children }) => {
   const [settings, setSettings] = useState({
-    companyName: 'FinTradify',
+    companyName: 'Aerowheels',
     theme: 'light',
     language: 'en',
     dateFormat: 'DD/MM/YYYY',

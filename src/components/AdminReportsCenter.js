@@ -266,7 +266,7 @@ const AdminReportsCenter = ({ onNavigate }) => {
 
   const exportCsv = (type) => {
     const label = type.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
-    downloadCsv(`fintradify-${label}-report-${range.from || 'start'}-to-${range.to || 'today'}.csv`, csvReports[type] || csvReports.summary);
+    downloadCsv(`aeroattendance-${label}-report-${range.from || 'start'}-to-${range.to || 'today'}.csv`, csvReports[type] || csvReports.summary);
   };
 
   const exportAttendanceCsv = async () => {
@@ -297,7 +297,7 @@ const AdminReportsCenter = ({ onNavigate }) => {
 
   const exportAllCsv = () => {
     const rows = [
-      ['Fintradify Reports Center Export'],
+      ['AeroAttendance Reports Center Export'],
       ['Range From', range.from],
       ['Range To', range.to],
       [],
@@ -321,7 +321,7 @@ const AdminReportsCenter = ({ onNavigate }) => {
       ['Reimbursements'],
       ...csvReports.reimbursements,
     ];
-    downloadCsv(`fintradify-all-reports-${range.from || 'start'}-to-${range.to || 'today'}.csv`, rows);
+    downloadCsv(`aeroattendance-all-reports-${range.from || 'start'}-to-${range.to || 'today'}.csv`, rows);
   };
 
   return (

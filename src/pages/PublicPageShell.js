@@ -22,7 +22,7 @@ const PublicPageShell = ({ page, children, showMetrics = true }) => {
         <section className="public-page__hero">
           <div className="public-page__inner public-page__hero-grid">
             <div>
-              <span className="public-page__eyebrow">{page.eyebrow || 'Fintradify'}</span>
+              <span className="public-page__eyebrow">{page.eyebrow || 'Aerowheels'}</span>
               <h1>{page.title}</h1>
               <p className="public-page__summary">{page.summary}</p>
               <div className="public-page__actions">

@@ -15,17 +15,17 @@ const navItems = [
 const Navbar = ({ darkMode = false }) => {
   const { siteData } = usePublicData();
   const brand = siteData.brand;
-  const logoSrc = brand.logo || '/fintradify-logo.png';
+  const logoSrc = brand.logo || '/aerowheels-logo.png';
 
   return (
     <header className={`public-navbar ${darkMode ? 'is-dark' : ''}`}>
       <div className="public-navbar__inner">
         <Link className="public-navbar__brand" to="/">
           <span className="public-navbar__logo-wrap">
-            <img src={logoSrc} alt={brand.shortName || 'Fintradify'} className="public-navbar__logo-img" />
+            <img src={logoSrc} alt={brand.shortName || 'AeroAttendance'} className="public-navbar__logo-img" />
           </span>
           <span className="public-navbar__brand-copy">
-            <strong>{brand.shortName || 'Fintradify'}</strong>
+            <strong>{brand.shortName || 'AeroAttendance'}</strong>
             <small>HR Portal</small>
           </span>
         </Link>

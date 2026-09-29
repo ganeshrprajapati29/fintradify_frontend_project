@@ -33,13 +33,13 @@ const typeLabels = {
 
 const getCertificateDownloadUrl = (certificate) => {
   if (!certificate?.certificateNo) return certificate?.certificateUrl || '#';
-  const baseUrl = api.defaults.baseURL || process.env.REACT_APP_API_URL || 'https://crm.fintradify.com/api';
+  const baseUrl = api.defaults.baseURL || process.env.REACT_APP_API_URL || 'http://72.60.41.224/api';
   return `${baseUrl.replace(/\/$/, '')}/certificates/download/${encodeURIComponent(certificate.certificateNo)}`;
 };
 
 const getCertificatePreviewUrl = (certificate) => {
   if (!certificate?.certificateNo) return certificate?.certificateUrl || '#';
-  const baseUrl = api.defaults.baseURL || process.env.REACT_APP_API_URL || 'https://crm.fintradify.com/api';
+  const baseUrl = api.defaults.baseURL || process.env.REACT_APP_API_URL || 'http://72.60.41.224/api';
   return `${baseUrl.replace(/\/$/, '')}/certificates/preview/${encodeURIComponent(certificate.certificateNo)}`;
 };
 
@@ -227,7 +227,7 @@ const CertificateManager = ({ isAdmin = false }) => {
         <div>
           <p className="certificate-eyebrow">{isAdmin ? 'HR documents' : 'Verified records'}</p>
           <h2 className="certificate-title">{isAdmin ? 'Certificate Generator' : 'My Certificates'}</h2>
-          <p className="certificate-subtitle">{isAdmin ? 'Generate one-page A4 certificates with logo watermark, signatures, stamp, email delivery, and QR verification.' : 'Download official QR-verifiable certificates issued by Fintradify HR.'}</p>
+          <p className="certificate-subtitle">{isAdmin ? 'Generate one-page A4 certificates with logo watermark, signatures, stamp, email delivery, and QR verification.' : 'Download official QR-verifiable certificates issued by AeroAttendance HR.'}</p>
         </div>
         <Button className="certificate-action-btn" variant="outline-primary" onClick={fetchData} disabled={loading}>Refresh</Button>
       </section>

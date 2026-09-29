@@ -8,7 +8,7 @@ const Contact = () => {
   const { siteData } = usePublicData();
   const brand = siteData.brand || {};
   const page = siteData.pages?.contact || {
-    title: 'Talk to Fintradify',
+    title: 'Talk to Aerowheels',
     eyebrow: 'Contact',
     summary: 'Reach the team for product questions, onboarding, support, or custom deployment discussions.',
   };
@@ -40,7 +40,7 @@ const Contact = () => {
             <span className="contact-page__eyebrow"><FaHeadset /> Faster response</span>
             <h2>Share your company size, required modules, and rollout timeline.</h2>
             <p>
-              The Fintradify team can help with attendance setup, leave policy, salary documents,
+              The Aerowheels team can help with attendance setup, leave policy, salary documents,
               certificates, employee onboarding, and custom deployment planning.
             </p>
             <div className="contact-page__actions">

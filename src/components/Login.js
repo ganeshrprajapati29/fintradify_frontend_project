@@ -177,7 +177,7 @@ const Login = () => {
         <div className="login-page__brand">
           <span>F</span>
           <div>
-            <strong>{brand.name || 'Fintradify HR Portal'}</strong>
+            <strong>{brand.name || 'AeroAttendance HR Portal'}</strong>
             <small>Secure workforce access</small>
           </div>
         </div>
@@ -338,7 +338,7 @@ const Login = () => {
         </Modal.Header>
         <Modal.Body className="login-modal__body">
           <h5>Introduction</h5>
-          <p>Fintradify protects login data used for admin and employee access to the HR Portal.</p>
+          <p>Aerowheels protects login data used for admin and employee access to the HR Portal.</p>
           <h5>Data Collection</h5>
           <p>We collect email addresses, admin passwords, and employee OTP verification data to provide secure access.</p>
           <h5>Data Usage</h5>
@@ -346,7 +346,7 @@ const Login = () => {
           <h5>Data Security</h5>
           <p>Role-based access, authenticated API calls, and secure workflows help protect HR operations.</p>
           <h5>Contact</h5>
-          <p>For privacy support, contact {brand.email || 'support@fintradify.com'}.</p>
+          <p>For privacy support, contact {brand.email || 'marketing@aerowheels.co.in'}.</p>
         </Modal.Body>
         <Modal.Footer>
           <Button variant="outline-primary" onClick={() => setShowPrivacyModal(false)}>Close</Button>

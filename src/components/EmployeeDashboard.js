@@ -1560,9 +1560,9 @@ const EmployeeDashboard = () => {
         {/* Sidebar for Desktop */}
         <div className="sidebar d-none d-lg-flex">
           <div className="employee-sidebar-brand">
-            <div className="employee-sidebar-logo">F</div>
+            <div className="employee-sidebar-logo" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}><img src="/aerowheels-mark.png" alt="Aerowheels" style={{ width: '80%', height: '80%', objectFit: 'contain' }} /></div>
             <div>
-              <h4>Fintradify</h4>
+              <h4>AeroAttendance</h4>
               <span>Employee portal</span>
             </div>
           </div>
@@ -1670,9 +1670,9 @@ const EmployeeDashboard = () => {
             </Offcanvas.Header>
             <Offcanvas.Body>
               <div className="employee-sidebar-brand mb-3">
-                <div className="employee-sidebar-logo">F</div>
+                <div className="employee-sidebar-logo" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}><img src="/aerowheels-mark.png" alt="Aerowheels" style={{ width: '80%', height: '80%', objectFit: 'contain' }} /></div>
                 <div>
-                  <h4>Fintradify</h4>
+                  <h4>AeroAttendance</h4>
                   <span>Employee portal</span>
                 </div>
               </div>
@@ -2029,7 +2029,7 @@ const EmployeeDashboard = () => {
                   color: '#64748b',
                 }}
               >
-                © {new Date().getFullYear()} Fintradify. All rights reserved.
+                © {new Date().getFullYear()} Aerowheels. All rights reserved.
               </p>
             </div>
             <Modal show={Boolean(quickTask)} onHide={closeQuickSubmitTask} centered>

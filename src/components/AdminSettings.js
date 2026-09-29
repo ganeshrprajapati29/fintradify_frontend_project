@@ -48,7 +48,7 @@ const AdminSettings = () => {
 
   const initializeFormStates = (data) => {
     setGeneralSettings({
-      companyName: data.companyName || 'FinTradify',
+      companyName: data.companyName || 'Aerowheels',
       theme: data.theme || 'light',
       language: data.language || 'en',
       dateFormat: data.dateFormat || 'DD/MM/YYYY',

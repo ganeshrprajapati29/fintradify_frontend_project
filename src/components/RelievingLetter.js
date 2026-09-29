@@ -16,7 +16,7 @@ const RelievingLetter = () => {
   const [employees, setEmployees] = useState([]);
   const [letters, setLetters] = useState([]);
   const [formData, setFormData] = useState({ employeeId: '', relievingDate: '', reason: 'Resignation' });
-  const [emailDraft, setEmailDraft] = useState({ subject: 'Relieving Letter - Fintradify', content: '' });
+  const [emailDraft, setEmailDraft] = useState({ subject: 'Relieving Letter - Aerowheels', content: '' });
   const [selectedLetter, setSelectedLetter] = useState(null);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -117,8 +117,8 @@ const RelievingLetter = () => {
   const openEmailModal = (letter) => {
     setSelectedLetter(letter);
     setEmailDraft({
-      subject: 'Relieving Letter - Fintradify',
-      content: `Dear ${letter.employee?.name || 'Employee'},\n\nYour relieving letter has been generated and is available for download.\n\nWe appreciate your contribution to Fintradify and wish you success in your future career.\n\nRegards,\nFintradify HR Team`,
+      subject: 'Relieving Letter - Aerowheels',
+      content: `Dear ${letter.employee?.name || 'Employee'},\n\nYour relieving letter has been generated and is available for download.\n\nWe appreciate your contribution to Aerowheels and wish you success in your future career.\n\nRegards,\nAerowheels HR Team`,
     });
     setShowEmailModal(true);
   };

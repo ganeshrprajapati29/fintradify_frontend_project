@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const instance = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'https://crm.fintradify.com/api', // Fallback for development
+  baseURL: process.env.REACT_APP_API_URL || 'http://72.60.41.224/api', // Fallback for development
   timeout: 10000,
 });
 

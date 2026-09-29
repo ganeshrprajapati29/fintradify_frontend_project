@@ -105,7 +105,7 @@ const ForgotPassword = () => {
         <div className="login-page__brand">
           <span>F</span>
           <div>
-            <strong>Fintradify HR Portal</strong>
+            <strong>AeroAttendance HR Portal</strong>
             <small>Employee password recovery</small>
           </div>
         </div>

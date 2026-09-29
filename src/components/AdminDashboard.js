@@ -397,7 +397,9 @@ const AdminDashboard = () => {
     const fetchOverview = async () => {
       try {
         const res = await axios.get(`${process.env.REACT_APP_API_URL}/attendance/overview`, { headers: authHeaders });
-        setOverview(res.data);
+        // Keep only { 'YYYY-MM-DD': [rows] } entries; the API returns { message } when there is no attendance yet.
+        const data = res.data && typeof res.data === 'object' ? res.data : {};
+        setOverview(Object.fromEntries(Object.entries(data).filter(([, rows]) => Array.isArray(rows))));
         setError('');
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to fetch attendance overview');
@@ -471,6 +473,7 @@ const AdminDashboard = () => {
 
   // Chart data
   const chartData = Object.keys(overview || {})
+    .filter((date) => Array.isArray(overview[date]))
     .sort((a, b) => new Date(a) - new Date(b))
     .map((date) => ({
       date,
@@ -502,7 +505,7 @@ const AdminDashboard = () => {
     .reduce((sum, slip) => sum + getAmount(slip), 0) || dashboardMetrics.monthlySalary || 0;
   const recentAttendanceRows = Object.keys(overview || {})
     .sort((a, b) => new Date(b) - new Date(a))
-    .flatMap((date) => (overview[date] || []).map((att) => ({ ...att, date })))
+    .flatMap((date) => (Array.isArray(overview[date]) ? overview[date] : []).map((att) => ({ ...att, date })))
     .slice(0, 8);
   const departmentEntries = Object.entries(
     dashboardEmployees.reduce((acc, emp) => {
@@ -1788,9 +1791,9 @@ const AdminDashboard = () => {
         {/* Sidebar for Desktop */}
         <div className="sidebar d-none d-lg-flex">
           <div className="admin-sidebar-brand">
-            <div className="admin-sidebar-logo">F</div>
+            <div className="admin-sidebar-logo" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}><img src="/aerowheels-mark.png" alt="Aerowheels" style={{ width: '80%', height: '80%', objectFit: 'contain' }} /></div>
             <div>
-              <h4>Fintradify</h4>
+              <h4>AeroAttendance</h4>
               <span>Admin portal</span>
             </div>
           </div>
@@ -1939,9 +1942,9 @@ const AdminDashboard = () => {
             </Offcanvas.Header>
             <Offcanvas.Body>
               <div className="admin-sidebar-brand mb-3">
-                <div className="admin-sidebar-logo">F</div>
+                <div className="admin-sidebar-logo" style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}><img src="/aerowheels-mark.png" alt="Aerowheels" style={{ width: '80%', height: '80%', objectFit: 'contain' }} /></div>
                 <div>
-                  <h4>Fintradify</h4>
+                  <h4>AeroAttendance</h4>
                   <span>Admin portal</span>
                 </div>
               </div>
@@ -2456,7 +2459,7 @@ const AdminDashboard = () => {
                   color: '#64748b',
                 }}
               >
-                © {new Date().getFullYear()} Fintradify. All rights reserved.
+                © {new Date().getFullYear()} Aerowheels. All rights reserved.
               </p>
             </div>
           </Container>

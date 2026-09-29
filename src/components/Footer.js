@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { FaArrowRight, FaEnvelope, FaFacebook, FaGooglePlay, FaInstagram, FaLinkedin, FaMapMarkerAlt, FaPhone, FaTwitter, FaYoutube } from 'react-icons/fa';
+import { FaArrowRight, FaEnvelope, FaGlobe, FaGooglePlay, FaMapMarkerAlt, FaPhone } from 'react-icons/fa';
 import { usePublicData } from '../contexts/PublicDataContext';
 import './Footer.css';
 
@@ -33,17 +33,14 @@ const groups = {
 };
 
 const socials = [
-  [FaFacebook, 'Facebook', 'https://facebook.com/fintradify'],
-  [FaTwitter, 'Twitter', 'https://twitter.com/fintradify'],
-  [FaLinkedin, 'LinkedIn', 'https://linkedin.com/company/fintradify'],
-  [FaInstagram, 'Instagram', 'https://instagram.com/fintradify'],
-  [FaYoutube, 'YouTube', 'https://youtube.com/fintradify'],
+  [FaGlobe, 'Aerowheels website', 'https://www.aerowheels.co.in/'],
+  [FaEnvelope, 'Email Aerowheels', 'mailto:marketing@aerowheels.co.in'],
 ];
 
 const Footer = ({ darkMode = false }) => {
   const { siteData } = usePublicData();
   const brand = siteData.brand;
-  const logoSrc = brand.logo || '/fintradify-logo.png';
+  const logoSrc = brand.logo || '/aerowheels-logo.png';
 
   return (
     <footer
@@ -54,10 +51,10 @@ const Footer = ({ darkMode = false }) => {
         <div className="public-footer__intro">
           <Link className="public-footer__brand" to="/">
             <span className="public-footer__logo-wrap">
-              <img src={logoSrc} alt={brand.shortName || 'Fintradify'} className="public-footer__logo-img" />
+              <img src={logoSrc} alt={brand.shortName || 'AeroAttendance'} className="public-footer__logo-img" />
             </span>
             <span className="public-footer__brand-copy">
-              <strong>{brand.shortName || 'Fintradify'}</strong>
+              <strong>{brand.shortName || 'AeroAttendance'}</strong>
               <small>HR Portal</small>
             </span>
           </Link>

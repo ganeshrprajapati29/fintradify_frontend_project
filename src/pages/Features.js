@@ -77,7 +77,7 @@ const Features = () => {
           <span className="features-ops__icon"><FaLayerGroup /></span>
           <h2>One system for admin and employee operations.</h2>
           <p>
-            Fintradify keeps daily HR actions practical: record attendance, approve requests,
+            Aerowheels keeps daily HR actions practical: record attendance, approve requests,
             assign work, publish documents, and verify employee certificates from public pages.
           </p>
           <div className="features-ops__actions">

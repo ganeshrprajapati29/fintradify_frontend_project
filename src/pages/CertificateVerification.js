@@ -5,7 +5,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import './PublicPage.css';
 
-const apiBase = process.env.REACT_APP_API_URL || 'https://crm.fintradify.com/api';
+const apiBase = process.env.REACT_APP_API_URL || 'http://72.60.41.224/api';
 
 const useQuery = () => new URLSearchParams(useLocation().search);
 
@@ -109,7 +109,7 @@ const CertificateVerification = () => {
         <div className="verify-shell">
           <section className="verify-hero">
             <div>
-              <p className="verify-eyebrow">Fintradify certificate verification</p>
+              <p className="verify-eyebrow">AeroAttendance certificate verification</p>
               <h1 className="verify-title">Verify official employee </h1>
               <p className="verify-copy">Enter certificate number, employee ID, registered email, or mobile number to view the employee profile, performance record, generated certificate preview, and PDF download.</p>
             </div>
@@ -189,7 +189,7 @@ const CertificateVerification = () => {
                 <div className="verify-preview-summary">
                   <p className="verify-eyebrow">{selectedCertificate.type} certificate</p>
                   <h3>{selectedCertificate.employee?.name || employee?.name || 'Employee'}</h3>
-                  <p>{selectedCertificate.description || `${selectedCertificate.title || 'Certificate'} issued by Fintradify with a one-page A4 PDF, logo watermark, certificate number, and QR verification.`}</p>
+                  <p>{selectedCertificate.description || `${selectedCertificate.title || 'Certificate'} issued by Aerowheels with a one-page A4 PDF, logo watermark, certificate number, and QR verification.`}</p>
                   <div className="verify-list" style={{ marginTop: '1rem' }}>
                     <div className="verify-row"><span>Certificate No</span><strong>{selectedCertificate.certificateNo}</strong></div>
                     <div className="verify-row"><span>Designation</span><strong>{selectedCertificate.designation || 'N/A'}</strong></div>
@@ -226,7 +226,7 @@ const CertificateVerification = () => {
                   <div className="verify-row"><span>Issue Date</span><strong>{formatDate(certificate.issueDate)}</strong></div>
                   <div className="verify-row"><span>Work Mode</span><strong>{certificate.workMode || 'N/A'}</strong></div>
                   <div className="verify-row"><span>Performance</span><strong>{certificate.performance || 'N/A'}</strong></div>
-                  <div className="verify-row"><span>Issued By</span><strong>{certificate.issuedBy || 'Fintradify HR'}</strong></div>
+                  <div className="verify-row"><span>Issued By</span><strong>{certificate.issuedBy || 'AeroAttendance HR'}</strong></div>
                   <div className="verify-row"><span>Manager</span><strong>{certificate.managerName || 'N/A'}</strong></div>
                   <div className="verify-row"><span>CEO / Signatory</span><strong>{certificate.ceoName || 'N/A'}</strong></div>
                   <div className="verify-row"><span>Email</span><strong>{certificate.employee?.email || 'N/A'}</strong></div>

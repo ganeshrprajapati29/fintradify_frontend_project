@@ -137,7 +137,7 @@ const AdminCredentials = () => {
                 name="email"
                 value={form.email}
                 onChange={handleChange}
-                placeholder="admin@fintradify.com"
+                placeholder="admin@aerowheels.co.in"
                 autoComplete="username"
                 required
               />

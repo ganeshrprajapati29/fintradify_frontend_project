@@ -48,7 +48,7 @@ const pageDesign = {
     accent: 'Newsroom',
     ctaLabel: 'Media Contact',
     ctaTo: 'mailto',
-    secondaryLabel: 'About Fintradify',
+    secondaryLabel: 'About Aerowheels',
     secondaryTo: '/about',
   },
   integrations: {
@@ -133,14 +133,14 @@ const pageDesign = {
   },
 };
 
-const makeCtaTarget = (target, brand) => (target === 'mailto' ? `mailto:${brand.email || 'support@fintradify.com'}` : target);
+const makeCtaTarget = (target, brand) => (target === 'mailto' ? `mailto:${brand.email || 'marketing@aerowheels.co.in'}` : target);
 
 const PublicStaticPage = ({ pageKey }) => {
   const { siteData } = usePublicData();
   const brand = siteData.brand || {};
   const page = siteData.pages?.[pageKey] || {
     title: titleFromKey(pageKey),
-    eyebrow: 'Fintradify',
+    eyebrow: 'Aerowheels',
     summary: 'This page is connected to the public content API and will update when backend content is changed.',
     sections: [],
   };
@@ -173,7 +173,7 @@ const PublicStaticPage = ({ pageKey }) => {
             <h3>Live portal context</h3>
             <div>
               <span>Brand</span>
-              <strong>{brand.shortName || brand.name || 'Fintradify'}</strong>
+              <strong>{brand.shortName || brand.name || 'Aerowheels'}</strong>
             </div>
             <div>
               <span>Public content</span>
@@ -181,7 +181,7 @@ const PublicStaticPage = ({ pageKey }) => {
             </div>
             <div>
               <span>Support</span>
-              <strong>{brand.email || 'support@fintradify.com'}</strong>
+              <strong>{brand.email || 'marketing@aerowheels.co.in'}</strong>
             </div>
           </aside>
         </div>

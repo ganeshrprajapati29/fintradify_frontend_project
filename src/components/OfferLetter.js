@@ -31,23 +31,23 @@ const initialFormData = {
   salaryStructureLabel: 'Monthly Salary + Incentives',
   salaryCondition: 'The variable part of your salary will be based on your performance and targets. Incentives will be reviewed and adjusted quarterly.',
   reportingManager: '',
-  workLocation: 'Noida, Uttar Pradesh',
+  workLocation: 'Mahipulpur Extension, New Delhi',
   workingHours: '10:00 AM to 6:00 PM',
   employmentType: 'Full-time',
   probationPeriod: '6',
   noticePeriod: '30',
   offerValidityDays: '7',
   logoUrl: '',
-  companyAddress: 'C6, C Block, Sector 7, Noida, Uttar Pradesh 201301',
-  companyEmail: 'support@fintradify.com',
-  companyPhone: '+91 78360 09907',
-  companyWebsite: 'www.fintradify.com',
+  companyAddress: 'Plot No. 498, Ground Floor, Kh-433/1 & 433/2, Block-A, Mahipulpur Extension, New Delhi, India - 110037',
+  companyEmail: 'marketing@aerowheels.co.in',
+  companyPhone: '011-46658638',
+  companyWebsite: 'www.aerowheels.co.in',
   customIntro: '',
   responsibilities: '',
   benefits: defaultBenefits,
   termsMode: 'append',
   terms: defaultTerms,
-  closingNote: 'Please sign and return a copy of this letter or confirm acceptance over official email. We look forward to welcoming you to the Fintradify team.',
+  closingNote: 'Please sign and return a copy of this letter or confirm acceptance over official email. We look forward to welcoming you to the Aerowheels team.',
 };
 
 const statusMeta = (status) => {
@@ -312,10 +312,10 @@ const OfferLetter = () => {
             <div className="doc-fieldset">
               <h4 className="doc-fieldset-title">Branding and company details</h4>
               <Row className="g-3">
-                <Col xs={12}><Form.Group><Form.Label>Logo URL</Form.Label><Form.Control value={formData.logoUrl} onChange={(event) => setFormData({ ...formData, logoUrl: event.target.value })} placeholder="Optional public logo URL, default Fintradify logo used" /><p className="doc-template-note">Leave blank to use the uploaded Fintradify logo from backend assets.</p></Form.Group></Col>
+                <Col xs={12}><Form.Group><Form.Label>Logo URL</Form.Label><Form.Control value={formData.logoUrl} onChange={(event) => setFormData({ ...formData, logoUrl: event.target.value })} placeholder="Optional public logo URL, default Aerowheels logo used" /><p className="doc-template-note">Leave blank to use the uploaded Aerowheels logo from backend assets.</p></Form.Group></Col>
                 <Col xs={12}>
                   <div className="doc-logo-preview">
-                    {formData.logoUrl ? <img src={formData.logoUrl} alt="Offer logo preview" onError={(event) => { event.currentTarget.style.display = 'none'; }} /> : <img src="/fintradify-logo.png" alt="Fintradify logo preview" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
+                    {formData.logoUrl ? <img src={formData.logoUrl} alt="Offer logo preview" onError={(event) => { event.currentTarget.style.display = 'none'; }} /> : <img src="/aerowheels-logo.png" alt="Aerowheels logo preview" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
                     <span className="doc-muted">PDF header logo preview</span>
                   </div>
                 </Col>
@@ -352,7 +352,7 @@ const OfferLetter = () => {
                   <strong>Date: {moment().format('DD MMMM YYYY')}</strong>
                   <div><strong>To, Mr. {previewName}</strong><br />{selectedEmployee?.address || 'Address not provided'}</div>
                   <div>Dear Mr. {previewName}</div>
-                  <div>We are pleased to {formData.documentType === 'appointment' ? 'appoint you with' : 'offer you employment with'} <strong>FinTradify</strong>, for the position of <strong>{formData.position || 'Role'}</strong>.</div>
+                  <div>We are pleased to {formData.documentType === 'appointment' ? 'appoint you with' : 'offer you employment with'} <strong>Aerowheels</strong>, for the position of <strong>{formData.position || 'Role'}</strong>.</div>
                   <div>Your employment will be effective from <strong>{previewDate}</strong>. You will be assigned <strong>Employee ID: {selectedEmployee?.employeeId || 'N/A'}</strong>.</div>
                   <div>You will report directly to <strong>{formData.reportingManager || 'HR Manager'}</strong>. Compensation: <strong>{previewCompensation}</strong>.</div>
                   <div>Your working hours will be from <strong>{formData.workingHours || '10:00 AM to 6:00 PM'}</strong>.</div>
@@ -381,10 +381,10 @@ const OfferLetter = () => {
                 <div className="offer-preview-clean-contact" />
                 <div className="offer-preview-text offer-preview-final">Wishing you all the best {String(previewName).split(' ')[0] || 'Candidate'},</div>
                 <div className="offer-preview-text offer-preview-contact">
-                  <div>{formData.companyPhone || '8882385802'}</div>
-                  <div>{formData.companyEmail || 'support@fintradify.com'}</div>
-                  <div>{formData.companyAddress || 'Office no-105, C-6, Sector 7, Noida'}</div>
-                  <div>{formData.companyWebsite || 'https://fintradify.com/'}</div>
+                  <div>{formData.companyPhone || '011-46658638'}</div>
+                  <div>{formData.companyEmail || 'marketing@aerowheels.co.in'}</div>
+                  <div>{formData.companyAddress || 'Plot No. 498, Mahipulpur Extension, New Delhi - 110037'}</div>
+                  <div>{formData.companyWebsite || 'www.aerowheels.co.in'}</div>
                 </div>
               </div>
             </div>

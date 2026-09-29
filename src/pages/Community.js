@@ -13,7 +13,7 @@ const communityTracks = [
 const Community = () => {
   const { siteData } = usePublicData();
   const page = siteData.pages?.community || {
-    title: 'Fintradify Community',
+    title: 'AeroAttendance Community',
     eyebrow: 'Community',
     summary: 'Connect with product updates, HR workflow guidance, webinars, and implementation support for your team.',
   };
