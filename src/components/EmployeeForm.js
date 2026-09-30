@@ -3,9 +3,17 @@ import { Form, Button, Alert, Table, Modal } from 'react-bootstrap';
 import axios from 'axios';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'animate.css';
+import EmployeeIdSeries from './EmployeeIdSeries';
+
+const idIcon = (
+  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
+  </svg>
+);
 
 const EmployeeForm = ({ employee, isEmployee, mode = 'add' }) => {
   const [formData, setFormData] = useState({
+    employeeId: employee ? employee.employeeId || '' : '',
     name: employee ? employee.name : '',
     email: employee ? employee.email : '',
     phone: employee ? employee.phone : '',
@@ -28,6 +36,8 @@ const EmployeeForm = ({ employee, isEmployee, mode = 'add' }) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const isEditMode = mode === 'edit';
+  const [nextEmployeeId, setNextEmployeeId] = useState('');
+  const [seriesKey, setSeriesKey] = useState(0);
 
   const fetchEmployees = async () => {
     if (isEmployee) return; // Employees don't fetch employee list
@@ -109,12 +119,13 @@ const EmployeeForm = ({ employee, isEmployee, mode = 'add' }) => {
         );
       }
 
-      setFormData({ name: '', email: '', phone: '', address: '', position: '', department: '', bankAccount: '', bankName: '', salary: '', joiningDate: '', password: '', profilePhoto: '' });
+      setFormData({ employeeId: '', name: '', email: '', phone: '', address: '', position: '', department: '', bankAccount: '', bankName: '', salary: '', joiningDate: '', password: '', profilePhoto: '' });
       setSelectedFile(null);
       setPhotoPreview('');
       fetchEmployees();
+      setSeriesKey((key) => key + 1);
       setError('');
-      setSuccess('Employee added successfully. Login details have been created for the employee.');
+      setSuccess(res.data?.message || `Employee ${res.data?.employeeId || ''} added successfully.`);
     } catch (err) {
       console.error('Add employee error:', err);
       setError(err.response?.data?.message || 'Error adding employee');
@@ -126,6 +137,7 @@ const EmployeeForm = ({ employee, isEmployee, mode = 'add' }) => {
   const handleEdit = (emp) => {
     setSelectedEmployee(emp);
     setFormData({
+      employeeId: emp.employeeId || '',
       name: emp.name,
       email: emp.email,
       phone: emp.phone,
@@ -1009,12 +1021,34 @@ const EmployeeForm = ({ employee, isEmployee, mode = 'add' }) => {
                 {success}
               </Alert>
             )}
+            <EmployeeIdSeries
+              key={seriesKey}
+              onChange={(preview, renumbered) => {
+                setNextEmployeeId(preview);
+                if (renumbered) fetchEmployees();
+              }}
+            />
             {!isEditMode && (
             <section className="admin-form-layout">
               <Form onSubmit={handleSubmit} className="admin-form-panel">
                 <p className="admin-section-eyebrow">Profile and payroll</p>
                 <h4 className="admin-section-title">Employee details</h4>
                 <div className="admin-form-grid">
+              <Form.Group controlId="employeeId" className="mb-3">
+                <Form.Label>
+                  {idIcon}
+                  Employee ID
+                </Form.Label>
+                <Form.Control
+                  type="text"
+                  name="employeeId"
+                  value={formData.employeeId}
+                  onChange={(e) => setFormData({ ...formData, employeeId: e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '') })}
+                  placeholder={nextEmployeeId ? `Auto: ${nextEmployeeId}` : 'Auto-generated'}
+                  maxLength={20}
+                />
+                <Form.Text muted>Leave blank to use the next ID from the series.</Form.Text>
+              </Form.Group>
               <Form.Group controlId="name" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.1s' }}>
                 <Form.Label>
                   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1316,6 +1350,21 @@ const EmployeeForm = ({ employee, isEmployee, mode = 'add' }) => {
           </Modal.Header>
           <Modal.Body>
             <Form onSubmit={handleUpdate}>
+              <Form.Group controlId="editEmployeeId" className="mb-3">
+                <Form.Label>
+                  {idIcon}
+                  Employee ID
+                </Form.Label>
+                <Form.Control
+                  type="text"
+                  name="employeeId"
+                  value={formData.employeeId}
+                  onChange={(e) => setFormData({ ...formData, employeeId: e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '') })}
+                  maxLength={20}
+                  required
+                />
+                <Form.Text muted>Must be unique, e.g. AWE001.</Form.Text>
+              </Form.Group>
               <Form.Group controlId="name" className="mb-3 animate__animated animate__fadeIn" style={{ animationDelay: '0.1s' }}>
                 <Form.Label>
                   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
