@@ -35,6 +35,7 @@ import EmployeeTeams from './EmployeeTeams';
 import EmployeeTracking from './EmployeeTracking';
 import AttendanceApprovals from './AttendanceApprovals';
 import DashboardLiveOps from './DashboardLiveOps';
+import UserManual from './UserManual';
 import RelievingLetter from './RelievingLetter';
 import OfferLetter from './OfferLetter';
 import CertificateManager from './CertificateManager';
@@ -83,6 +84,7 @@ const ADMIN_TABS = [
   'notifications',
   'login-credentials',
   'settings',
+  'user-manual',
 ];
 
 const TAB_LABELS = {
@@ -116,6 +118,7 @@ const TAB_LABELS = {
   notifications: 'Notifications',
   'login-credentials': 'Login Credentials',
   settings: 'Settings',
+  'user-manual': 'User Manual',
 };
 
 const ADMIN_NAV_GROUPS = [
@@ -125,6 +128,7 @@ const ADMIN_NAV_GROUPS = [
   { title: 'Work & Payroll', items: ['monthly-performance', 'tasks', 'salary', 'reimbursements'] },
   { title: 'HR Documents', items: ['relieving-letter', 'offer-letter', 'certificates', 'documents', 'compliance-center'] },
   { title: 'System', items: ['notifications', 'login-credentials', 'settings'] },
+  { title: 'Help', items: ['user-manual'] },
 ];
 
 const renderAdminNavIcon = (tab) => (
@@ -133,6 +137,7 @@ const renderAdminNavIcon = (tab) => (
     {tab === 'reports-center' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 19h16M7 16V9m5 7V5m5 11v-4M6 5h12" />}
     {['add-employee', 'edit-employee', 'employee-list', 'block-employees', 'unblock-employees', 'teams'].includes(tab) && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m4 6v-2a4 4 0 00-8 0v2m12-10a4 4 0 11-8 0 4 4 0 018 0zm6 1a3 3 0 11-6 0 3 3 0 016 0z" />}
     {tab === 'tracking' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 11a3 3 0 100-6 3 3 0 000 6zm0 10s7-4.5 7-11a7 7 0 10-14 0c0 6.5 7 11 7 11z" />}
+    {tab === 'user-manual' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />}
     {tab === 'attendance-approvals' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4M8 7V3m8 4V3M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />}
     {['attendance', 'manual-attendance', 'active-attendance', 'leaves', 'paid-leaves'].includes(tab) && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3M5 11h14M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />}
     {tab === 'wfh' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7m-9 11v-6h4v6m5-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-8 0H6a1 1 0 01-1-1V10" />}
@@ -2443,6 +2448,11 @@ const AdminDashboard = () => {
                   <EmployeeTeams />
                 </Card.Body>
               </Card>
+            )}
+            {activeTab === 'user-manual' && (
+              <div className="animate__animated animate__fadeInUp">
+                <UserManual role="admin" onNavigate={handleTabClick} />
+              </div>
             )}
             {activeTab === 'attendance-approvals' && (
               <div className="animate__animated animate__fadeInUp">

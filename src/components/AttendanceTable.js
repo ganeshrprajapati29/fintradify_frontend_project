@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Badge, Button, Col, Form, Modal, Pagination, Row, Spinner, Table } from 'react-bootstrap';
 import moment from 'moment';
 import api from '../utils/axios';
+import downloadReport from '../utils/downloadReport';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 const getRows = (payload) => payload?.data || payload?.attendances || (Array.isArray(payload) ? payload : []);
@@ -186,24 +187,12 @@ const AttendanceTable = ({ isEmployee }) => {
     }
     try {
       const downloadEndpoint = isEmployee ? '/attendance/download/my-attendance' : '/attendance/download';
-      const response = await api.get(downloadEndpoint, {
-        params: { startDate, endDate },
-        responseType: 'blob',
-      });
-      const blob = new Blob([response.data], { type: 'text/csv; charset=utf-8' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `${isEmployee ? 'my-' : ''}attendance-${startDate}-${endDate}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      setSuccess('Attendance CSV downloaded successfully');
+      const name = await downloadReport(downloadEndpoint, { startDate, endDate }, `attendance-report-${startDate}-to-${endDate}.csv`);
+      setSuccess(`Attendance report downloaded: ${name}`);
       setError('');
     } catch (err) {
       setSuccess('');
-      setError(err.response?.data?.message || 'Error downloading attendance CSV');
+      setError(err.message);
     }
   };
 

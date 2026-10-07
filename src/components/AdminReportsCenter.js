@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Form, Spinner, Table } from 'react-bootstrap';
 import { FaCalendarCheck, FaChartPie, FaClipboardList, FaDownload, FaFileCsv, FaFileInvoiceDollar, FaRedo, FaUsers } from 'react-icons/fa';
 import api from '../utils/axios';
+import downloadReport from '../utils/downloadReport';
 
 const getRows = (payload) => {
   if (Array.isArray(payload)) return payload;
@@ -277,21 +278,9 @@ const AdminReportsCenter = ({ onNavigate }) => {
 
     setError('');
     try {
-      const response = await api.get('/attendance/download', {
-        params: { startDate: range.from, endDate: range.to },
-        responseType: 'blob',
-      });
-      const blob = new Blob([response.data], { type: 'text/csv; charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `attendance-${range.from}-${range.to}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      await downloadReport('/attendance/download', { startDate: range.from, endDate: range.to }, `attendance-report-${range.from}-to-${range.to}.csv`);
     } catch (err) {
-      setError(err.response?.data?.message || 'Error downloading attendance CSV in attendance module format.');
+      setError(err.message);
     }
   };
 

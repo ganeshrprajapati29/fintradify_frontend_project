@@ -30,6 +30,7 @@ import SalarySlip from './SalarySlip';
 import Profile from './ProfileDisplay';
 import EmployeeProfileEdit from './EmployeeProfileEdit';
 import AttendanceCalendar from './AttendanceCalendar';
+import UserManual from './UserManual';
 import EmployeeSettings from './EmployeeSettings';
 import EmployeePasswordSettings from './EmployeePasswordSettings';
 import EmployeeTasks from './EmployeeTasks';
@@ -399,6 +400,7 @@ const EmployeeDashboard = () => {
     { key: 'settings', label: 'Settings' },
     { key: 'change-password', label: 'Change Password' },
     { key: 'edit-profile', label: 'Edit Profile' },
+    { key: 'user-manual', label: 'User Manual' },
   ];
 
   const navGroups = [
@@ -407,6 +409,7 @@ const EmployeeDashboard = () => {
     { title: 'Work', items: ['tasks', 'reimbursements'] },
     { title: 'Documents', items: ['salary', 'certificates', 'documents'] },
     { title: 'Account', items: ['notifications', 'settings', 'change-password', 'edit-profile'] },
+    { title: 'Help', items: ['user-manual'] },
   ];
 
   const activeNavItem = navItems.find((item) => item.key === activeTab) || navItems[0];
@@ -414,6 +417,7 @@ const EmployeeDashboard = () => {
   const renderNavIcon = (tab) => (
     <svg className="employee-nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
       {tab === 'profile' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7m-9 11v-6h4v6m5-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-8 0H6a1 1 0 01-1-1V10" />}
+      {tab === 'user-manual' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />}
       {tab === 'attendance-calendar' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />}
       {tab === 'attendance' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z" />}
       {tab === 'leaves' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5h6m-6 4h6m-7 4h8M5 4h14v16H5z" />}
@@ -2011,6 +2015,11 @@ const EmployeeDashboard = () => {
             {activeTab === 'settings' && (
               <div className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.6s' }}>
                 <EmployeeSettings />
+              </div>
+            )}
+            {activeTab === 'user-manual' && (
+              <div className="animate__animated animate__fadeInUp">
+                <UserManual role="employee" />
               </div>
             )}
             {activeTab === 'change-password' && (
