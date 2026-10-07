@@ -36,6 +36,25 @@ const MapBounds = ({ employees, fitKey, routePoints }) => {
   return null;
 };
 
+// Keeps the selected employee centred as live points arrive.
+const FollowPoint = ({ point }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (point) map.panTo(point, { animate: true });
+  }, [point, map]);
+  return null;
+};
+
+const todayKey = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+
+const metersBetween = (a, b) => {
+  const R = 6371000;
+  const dLat = (b[0] - a[0]) * Math.PI / 180;
+  const dLng = (b[1] - a[1]) * Math.PI / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * Math.PI / 180) * Math.cos(b[0] * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+};
+
 const googleMapsUrl = (lat, lng) => `https://www.google.com/maps?q=${lat},${lng}`;
 
 const formatClock = (value) => {
@@ -88,14 +107,19 @@ const EmployeeTracking = () => {
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState('');
   const selectedRef = useRef(null);
+  const [liveConnected, setLiveConnected] = useState(false);
+  const [follow, setFollow] = useState(true);
+  const [followPoint, setFollowPoint] = useState(null);
+  const [routeDate, setRouteDate] = useState(todayKey());
+  const routeDateRef = useRef(todayKey());
 
   const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` });
 
-  const fetchRoute = async (employeeId, silent = false) => {
+  const fetchRoute = async (employeeId, silent = false, date = routeDateRef.current) => {
     if (!employeeId) return;
     if (!silent) setRouteLoading(true);
     try {
-      const res = await axios.get(`${process.env.REACT_APP_API_URL}/tracking/route/${employeeId}`, { headers: authHeaders() });
+      const res = await axios.get(`${process.env.REACT_APP_API_URL}/tracking/route/${employeeId}`, { headers: authHeaders(), params: { date } });
       if (selectedRef.current === employeeId) {
         setRoute(res.data || null);
         setRouteError('');
@@ -109,10 +133,64 @@ const EmployeeTracking = () => {
 
   const openRoute = (employeeId) => {
     selectedRef.current = employeeId;
+    routeDateRef.current = todayKey();
+    setRouteDate(todayKey());
     setSelectedId(employeeId);
     setRoute(null);
+    setFollowPoint(null);
     setView('map');
-    fetchRoute(employeeId);
+    fetchRoute(employeeId, false, todayKey());
+  };
+
+  const changeRouteDate = (date) => {
+    if (!date) return;
+    routeDateRef.current = date;
+    setRouteDate(date);
+    setRoute(null);
+    fetchRoute(selectedRef.current, false, date);
+  };
+
+  // A live point from the server stream: move the marker and extend today's route.
+  const applyLivePoint = (data) => {
+    if (!data || !data.employeeId) return;
+    const stamp = data.timestamp || new Date().toISOString();
+    setEmployees((prev) => prev.map((employee) => (employee._id === data.employeeId ? {
+      ...employee,
+      currentLocation: {
+        latitude: data.latitude,
+        longitude: data.longitude,
+        accuracy: data.accuracy,
+        speed: data.speed,
+        address: data.address || employee.currentLocation?.address || '',
+        timestamp: stamp,
+        batteryLevel: data.batteryLevel ?? employee.currentLocation?.batteryLevel,
+        source: data.source || 'gps',
+      },
+      insideZone: typeof data.insideZone === 'boolean' ? data.insideZone : employee.insideZone,
+      distanceFromZone: Number.isFinite(data.distanceFromZone) ? data.distanceFromZone : employee.distanceFromZone,
+      minutesSinceUpdate: 0,
+      isLive: true,
+      lastLocationUpdate: stamp,
+    } : employee)));
+    setLastRefreshed(new Date());
+
+    if (selectedRef.current === data.employeeId && routeDateRef.current === todayKey()) {
+      setRoute((prev) => {
+        if (!prev) return prev;
+        const points = prev.route || [];
+        const last = points[points.length - 1];
+        const step = last ? metersBetween([last.latitude, last.longitude], [data.latitude, data.longitude]) : 0;
+        return {
+          ...prev,
+          route: [...points, { latitude: data.latitude, longitude: data.longitude, accuracy: data.accuracy, timestamp: stamp, address: data.address || '', speed: data.speed, distance: Math.round(step), sequence: points.length + 1 }],
+          totalPoints: points.length + 1,
+          totalDistance: (prev.totalDistance || 0) + Math.round(step),
+          firstSeen: prev.firstSeen || stamp,
+          lastSeen: stamp,
+        };
+      });
+      setFollowPoint([data.latitude, data.longitude]);
+    }
   };
 
   const closeRoute = () => {
@@ -143,13 +221,46 @@ const EmployeeTracking = () => {
 
   useEffect(() => {
     fetchTracking();
-    const interval = setInterval(() => fetchTracking(true), 20000);
+    const interval = setInterval(() => fetchTracking(true), 30000);
+
+    // Live stream (Server-Sent Events). EventSource cannot send the auth header, so a
+    // one-time ticket is requested first. On any error we reconnect with a fresh ticket;
+    // the 30s polling above keeps the page correct while the stream is down.
+    let source = null;
+    let retryTimer = null;
+    let closed = false;
+    const connectStream = async () => {
+      if (closed || typeof window.EventSource === 'undefined') return;
+      try {
+        const res = await axios.post(`${process.env.REACT_APP_API_URL}/tracking/stream-ticket`, {}, { headers: authHeaders() });
+        if (closed) return;
+        source = new window.EventSource(`${process.env.REACT_APP_API_URL}/tracking/stream?ticket=${res.data.ticket}`);
+        source.addEventListener('ready', () => setLiveConnected(true));
+        source.addEventListener('location', (event) => {
+          try { applyLivePoint(JSON.parse(event.data)); } catch (parseError) { /* ignore malformed frame */ }
+        });
+        source.addEventListener('attendance', () => fetchTracking(true));
+        source.onerror = () => {
+          setLiveConnected(false);
+          if (source) source.close();
+          source = null;
+          if (!closed) retryTimer = setTimeout(connectStream, 5000);
+        };
+      } catch (streamError) {
+        setLiveConnected(false);
+        if (!closed) retryTimer = setTimeout(connectStream, 10000);
+      }
+    };
+    connectStream();
 
     const handleAttendanceUpdate = () => fetchTracking(true);
     window.addEventListener('attendanceUpdated', handleAttendanceUpdate);
 
     return () => {
       clearInterval(interval);
+      closed = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      if (source) source.close();
       window.removeEventListener('attendanceUpdated', handleAttendanceUpdate);
     };
   }, []);
@@ -599,9 +710,10 @@ const EmployeeTracking = () => {
         <div>
           <p className="tracking-eyebrow">Live employee tracking</p>
           <h3 className="tracking-title">Location Monitor</h3>
-          <p className="tracking-subtitle">See where every employee is right now, whether they are inside their punch area, and today's route. Auto-refreshes every 20 seconds.</p>
+          <p className="tracking-subtitle">See where every employee is right now, their shift, whether they are inside their punch area, and the route they took. Positions move on the map the moment a phone reports them.</p>
           <p className="tracking-subtitle mb-0">
-            <span className="tracking-live-dot" /> {stats.live} live now · last updated {lastRefreshed ? lastRefreshed.toLocaleTimeString('en-IN') : '—'}
+            <span className="tracking-live-dot" style={liveConnected ? undefined : { background: '#d97706', animation: 'none' }} />
+            {liveConnected ? 'Live stream connected' : 'Live stream reconnecting (refreshing every 30s)'} · {stats.live} live now · last update {lastRefreshed ? lastRefreshed.toLocaleTimeString('en-IN') : '—'}
           </p>
         </div>
         <Button type="button" className="tracking-action" onClick={() => fetchTracking(true)} disabled={loading || refreshing}>
@@ -685,6 +797,7 @@ const EmployeeTracking = () => {
                   routePoints={routePoints}
                   fitKey={`${filter}|${query}|${locatedEmployees.length > 0}|${selectedId || ''}|${routePoints.length ? 'route' : ''}`}
                 />
+                {follow && selectedId && followPoint && <FollowPoint point={followPoint} />}
                 {routePoints.length > 1 && (
                   <Polyline positions={routePoints} pathOptions={{ color: '#d0142a', weight: 4, opacity: 0.8 }} />
                 )}
@@ -749,6 +862,7 @@ const EmployeeTracking = () => {
                           <div className="mt-2 small">
                             <div><strong>ID:</strong> {employee.employeeId || 'N/A'}</div>
                             <div><strong>Team:</strong> {employee.team || employee.department || 'N/A'}</div>
+                            <div><strong>Shift:</strong> {employee.shift?.label || 'N/A'}{employee.isLate ? ` · late ${employee.lateMinutes || ''}m` : ''}</div>
                             <div><strong>Punch area:</strong> {zoneLabel(employee)}</div>
                             {meta.address && <div><strong>Address:</strong> {meta.address}</div>}
                             <div><strong>Hours:</strong> {(Number(employee.hoursWorked) || 0).toFixed(2)} hrs</div>
@@ -774,18 +888,31 @@ const EmployeeTracking = () => {
             <div className="tracking-route-panel">
               <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <div>
-                  <strong>{route?.employee?.name || employees.find((e) => e._id === selectedId)?.name || 'Employee'} · today's route</strong>
+                  <strong>{route?.employee?.name || employees.find((e) => e._id === selectedId)?.name || 'Employee'} · route {routeDate === todayKey() ? '(today, live)' : `on ${routeDate}`}</strong>
                   <div className="small text-muted">
                     {routeLoading ? 'Loading route...' : route
                       ? `${route.totalPoints} points · ${(route.totalDistance / 1000).toFixed(2)} km · ${formatClock(route.firstSeen)} – ${formatClock(route.lastSeen)}`
                       : ''}
                   </div>
                 </div>
-                <button type="button" className="tracking-filter-btn" onClick={closeRoute}>Close route</button>
+                <div className="d-flex flex-wrap align-items-center gap-2">
+                  <input
+                    type="date"
+                    className="tracking-select"
+                    style={{ width: 'auto' }}
+                    value={routeDate}
+                    max={todayKey()}
+                    onChange={(event) => changeRouteDate(event.target.value)}
+                  />
+                  <button type="button" className={`tracking-filter-btn ${follow ? 'active' : ''}`} onClick={() => setFollow(!follow)}>
+                    {follow ? 'Following' : 'Follow'}
+                  </button>
+                  <button type="button" className="tracking-filter-btn" onClick={closeRoute}>Close route</button>
+                </div>
               </div>
               {routeError && <Alert variant="danger" className="mt-2 mb-0">{routeError}</Alert>}
               {route && !route.totalPoints && !routeLoading && (
-                <div className="small text-muted mt-2">No locations recorded for this employee today.</div>
+                <div className="small text-muted mt-2">No locations recorded for this employee on this date.</div>
               )}
               {route?.totalPoints > 0 && (
                 <div className="tracking-timeline">
@@ -823,6 +950,7 @@ const EmployeeTracking = () => {
                   <tr>
                     <th>Employee</th>
                     <th>Team</th>
+                    <th>Shift</th>
                     <th>Attendance</th>
                     <th>GPS</th>
                     <th>Punch Area</th>
@@ -856,7 +984,14 @@ const EmployeeTracking = () => {
                           </div>
                         </td>
                         <td>{employee.team || employee.department || 'N/A'}</td>
-                        <td><span className={`tracking-status ${employee.isActive ? 'active' : 'inactive'}`}>{employee.isActive ? 'Punched in' : 'Not punched'}</span></td>
+                        <td>
+                          <div className="small fw-semibold" style={{ color: employee.shift?.color || '#0f172a' }}>{employee.shift?.name || 'N/A'}</div>
+                          <div className="small text-muted">{employee.shift ? `${employee.shift.startTime}–${employee.shift.endTime}` : ''}</div>
+                        </td>
+                        <td>
+                          <span className={`tracking-status ${employee.isActive ? 'active' : 'inactive'}`}>{employee.isActive ? 'Punched in' : 'Not punched'}</span>
+                          {employee.isLate && <span className="tracking-status stale ms-1">Late</span>}
+                        </td>
                         <td><span className={`tracking-status ${location ? 'located' : 'missing'}`}>{location ? meta.source : 'No GPS'}</span></td>
                         <td>
                           <div className="small fw-semibold">{zoneLabel(employee)}</div>

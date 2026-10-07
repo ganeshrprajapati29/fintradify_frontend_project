@@ -52,7 +52,7 @@ const AttendanceTable = ({ isEmployee }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [punchStatus, setPunchStatus] = useState({ canPunchIn: true, canPunchOut: false });
+  const [punchStatus, setPunchStatus] = useState({ canPunchIn: true, canPunchOut: false, shiftLabel: '' });
   const [punchModePopup, setPunchModePopup] = useState(null);
 
   const endpoint = isEmployee ? '/attendance/my-attendance' : '/attendance';
@@ -71,14 +71,15 @@ const AttendanceTable = ({ isEmployee }) => {
 
   const fetchPunchStatus = async () => {
     if (!isEmployee) return;
-    const today = moment().format('YYYY-MM-DD');
-    const response = await api.get('/attendance/my-attendance', {
-      params: { startDate: today, endDate: today, page: 1, limit: 1 },
-    });
-    const todayAttendance = getRows(response.data)[0];
+    // Shift-aware state from the server (handles night shifts that end after midnight).
+    const response = await api.get('/attendance/current');
+    const current = response.data?.data || {};
     setPunchStatus({
-      canPunchIn: !todayAttendance || !todayAttendance.punchIn,
-      canPunchOut: !!todayAttendance?.punchIn && !todayAttendance?.punchOut,
+      canPunchIn: Boolean(current.canPunchIn),
+      canPunchOut: Boolean(current.canPunchOut),
+      shiftLabel: current.shiftLabel || '',
+      isLate: Boolean(current.attendance?.isLate),
+      lateMinutes: current.attendance?.lateMinutes || 0,
     });
   };
 
@@ -576,6 +577,11 @@ const AttendanceTable = ({ isEmployee }) => {
               <div>
                 <p className="attendance-eyebrow">Today status</p>
                 <strong>{punchStatus.canPunchIn ? 'Ready to punch in' : punchStatus.canPunchOut ? 'Working session active' : 'Punch completed'}</strong>
+                {punchStatus.shiftLabel && (
+                  <div className="small text-muted mt-1">
+                    Shift: {punchStatus.shiftLabel}{punchStatus.isLate ? ` · late by ${punchStatus.lateMinutes} min` : ''}
+                  </div>
+                )}
               </div>
               <Badge bg={punchStatus.canPunchOut ? 'success' : punchStatus.canPunchIn ? 'primary' : 'secondary'}>
                 {moment().format('DD MMM')}
