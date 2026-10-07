@@ -137,7 +137,7 @@ const LandingPage = () => {
               </div>
               <div className="landing-dashboard__activity">
                 <span><FaCalendarCheck /> Attendance window: {settings?.workStartTime || '09:00'} - {settings?.workEndTime || '18:00'}</span>
-                <span><FaTasks /> Task and leave records synced from backend</span>
+                <span><FaTasks /> Tasks, leave and approvals in one place</span>
               </div>
             </aside>
           </div>
@@ -251,16 +251,16 @@ const LandingPage = () => {
               <article className="landing-insight-card is-primary">
                 <h2>Configured Working Policy</h2>
                 <p>
-                  Work timing is live from backend settings: {settings?.workStartTime || '09:00'} to {settings?.workEndTime || '18:00'}.
+                  Office timing: {settings?.workStartTime || '09:00'} to {settings?.workEndTime || '18:00'}, with day, evening and night shifts supported.
                   Working days: {(settings?.workingDays || []).join(', ')}.
                 </p>
               </article>
               <article className="landing-insight-card">
                 <h2>Why Teams Choose It</h2>
                 <ul className="public-list">
-                  <li><FaCheck /> Admin and employee portals are connected.</li>
-                  <li><FaCheck /> Attendance, leave, salary documents, and tasks use backend data.</li>
-                  <li><FaCheck /> Public pages now load from one API contract.</li>
+                  <li><FaCheck /> Admin portal and employee mobile app always in sync.</li>
+                  <li><FaCheck /> Location-verified punch in with admin approval.</li>
+                  <li><FaCheck /> Live tracking radar for field and office teams.</li>
                 </ul>
               </article>
             </div>
@@ -279,15 +279,15 @@ const LandingPage = () => {
                 </ul>
               </article>
               <article className="landing-insight-card is-dark">
-                <h2>Professional Public Website</h2>
+                <h2>Built for Teams on the Move</h2>
                 <p>
-                  Public pages now use dynamic backend content for product, company, legal, support,
-                  community, integrations, API, and status pages, keeping the website consistent with the portal.
+                  Whether your people work at the office, at client sites or on the road, AeroAttendance shows
+                  who is on duty, where they are and how their day is going.
                 </p>
                 <ul className="public-list">
-                  <li>One public content endpoint for all website pages.</li>
-                  <li>Live aggregate metrics from backend collections.</li>
-                  <li>Reusable responsive layout for every route.</li>
+                  <li>Live location and route history for on-duty employees.</li>
+                  <li>Day, evening and night shifts with late alerts.</li>
+                  <li>Works on the web portal and the mobile app.</li>
                 </ul>
               </article>
             </div>

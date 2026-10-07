@@ -236,7 +236,7 @@ const EmployeeSettings = () => {
         <div>
           <p className="settings-eyebrow">Employee settings</p>
           <h2 className="settings-title">Settings</h2>
-          <p className="settings-subtitle">Your preferences are saved locally. Company policies and work rules come from backend settings.</p>
+          <p className="settings-subtitle">Your preferences are saved on this device. Company policies and work rules are set by HR.</p>
         </div>
         <Button className="settings-action-btn" variant="primary" onClick={savePreferences} disabled={saving}>
           {saving ? 'Saving...' : 'Save Preferences'}

@@ -28,7 +28,7 @@ const featureIcons = [
 ];
 
 const capabilityRows = [
-  ['Live HR data', 'Attendance, leave, tasks, salary documents, and employee records stay connected through one backend.'],
+  ['Live HR data', 'Attendance, leave, tasks, salary documents, and employee records stay connected in one platform.'],
   ['Admin control', 'Admins can manage daily operations, approvals, employee details, certificates, and documents from one place.'],
   ['Employee self-service', 'Employees can access profile, attendance, leave, salary, certificates, and updates without manual follow-up.'],
 ];

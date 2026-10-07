@@ -382,7 +382,7 @@ const AdminTasks = () => {
         <div>
           <p className="tasks-eyebrow">Work allocation</p>
           <h2 className="tasks-title">Tasks</h2>
-          <p className="tasks-subtitle">Assign, track, and complete employee tasks using live backend records.</p>
+          <p className="tasks-subtitle">Assign, track, and complete employee tasks in real time.</p>
         </div>
         <Button className="tasks-action" onClick={openCreateModal}>Assign New Task</Button>
       </section>

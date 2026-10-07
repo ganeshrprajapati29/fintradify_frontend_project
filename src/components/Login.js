@@ -344,7 +344,7 @@ const Login = () => {
           <h5>Data Usage</h5>
           <p>Your data is used for authentication, account management, notifications, and portal access.</p>
           <h5>Data Security</h5>
-          <p>Role-based access, authenticated API calls, and secure workflows help protect HR operations.</p>
+          <p>Role-based access, secure sign-in and encrypted connections protect your HR data.</p>
           <h5>Contact</h5>
           <p>For privacy support, contact {brand.email || 'marketing@aerowheels.co.in'}.</p>
         </Modal.Body>

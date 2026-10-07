@@ -312,7 +312,7 @@ const OfferLetter = () => {
             <div className="doc-fieldset">
               <h4 className="doc-fieldset-title">Branding and company details</h4>
               <Row className="g-3">
-                <Col xs={12}><Form.Group><Form.Label>Logo URL</Form.Label><Form.Control value={formData.logoUrl} onChange={(event) => setFormData({ ...formData, logoUrl: event.target.value })} placeholder="Optional public logo URL, default Aerowheels logo used" /><p className="doc-template-note">Leave blank to use the uploaded Aerowheels logo from backend assets.</p></Form.Group></Col>
+                <Col xs={12}><Form.Group><Form.Label>Logo URL</Form.Label><Form.Control value={formData.logoUrl} onChange={(event) => setFormData({ ...formData, logoUrl: event.target.value })} placeholder="Optional public logo URL, default Aerowheels logo used" /><p className="doc-template-note">Leave blank to use the Aerowheels company logo.</p></Form.Group></Col>
                 <Col xs={12}>
                   <div className="doc-logo-preview">
                     {formData.logoUrl ? <img src={formData.logoUrl} alt="Offer logo preview" onError={(event) => { event.currentTarget.style.display = 'none'; }} /> : <img src="/aerowheels-logo.png" alt="Aerowheels logo preview" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}

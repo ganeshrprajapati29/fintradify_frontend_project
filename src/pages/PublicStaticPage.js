@@ -56,13 +56,13 @@ const pageDesign = {
     accent: 'Connected systems',
     ctaLabel: 'Discuss Integration',
     ctaTo: '/contact',
-    secondaryLabel: 'API Details',
-    secondaryTo: '/api',
+    secondaryLabel: 'View Features',
+    secondaryTo: '/features',
   },
   api: {
     Icon: FaCode,
-    accent: 'Developer platform',
-    ctaLabel: 'Read Docs',
+    accent: 'Portal and mobile app',
+    ctaLabel: 'Read Guides',
     ctaTo: '/docs',
     secondaryLabel: 'Contact Support',
     secondaryTo: '/contact',
@@ -77,11 +77,11 @@ const pageDesign = {
   },
   docs: {
     Icon: FaBookOpen,
-    accent: 'Implementation docs',
+    accent: 'Setup guides',
     ctaLabel: 'Open Portal',
     ctaTo: '/login',
-    secondaryLabel: 'API Platform',
-    secondaryTo: '/api',
+    secondaryLabel: 'Help Center',
+    secondaryTo: '/help',
   },
   status: {
     Icon: FaBroadcastTower,
@@ -128,8 +128,8 @@ const pageDesign = {
     accent: 'Trust controls',
     ctaLabel: 'Security Contact',
     ctaTo: 'mailto',
-    secondaryLabel: 'API Platform',
-    secondaryTo: '/api',
+    secondaryLabel: 'Privacy Policy',
+    secondaryTo: '/privacy-policy',
   },
 };
 
@@ -141,7 +141,7 @@ const PublicStaticPage = ({ pageKey }) => {
   const page = siteData.pages?.[pageKey] || {
     title: titleFromKey(pageKey),
     eyebrow: 'Aerowheels',
-    summary: 'This page is connected to the public content API and will update when backend content is changed.',
+    summary: 'Attendance, leave, payroll documents and live tracking for growing teams.',
     sections: [],
   };
   const design = pageDesign[pageKey] || pageDesign.about;
@@ -170,14 +170,14 @@ const PublicStaticPage = ({ pageKey }) => {
           </article>
 
           <aside className="public-dynamic-page__snapshot">
-            <h3>Live portal context</h3>
+            <h3>At a glance</h3>
             <div>
-              <span>Brand</span>
+              <span>Company</span>
               <strong>{brand.shortName || brand.name || 'Aerowheels'}</strong>
             </div>
             <div>
-              <span>Public content</span>
-              <strong>{sections.length || 0} sections</strong>
+              <span>Phone</span>
+              <strong>{brand.phone || '01146658638'}</strong>
             </div>
             <div>
               <span>Support</span>
@@ -213,8 +213,8 @@ const PublicStaticPage = ({ pageKey }) => {
 
         <div className="public-dynamic-page__cta">
           <div>
-            <span><FaEnvelope /> Connected public data</span>
-            <h2>Content, contact details, and operational messaging stay aligned with the backend.</h2>
+            <span><FaEnvelope /> Talk to us</span>
+            <h2>Want a walkthrough of AeroAttendance for your team? The Aerowheels team is happy to help.</h2>
           </div>
           <div className="public-dynamic-page__cta-actions">
             <Link className="public-button primary" to="/login">Open Portal</Link>

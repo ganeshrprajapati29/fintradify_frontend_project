@@ -15,7 +15,7 @@ const Pricing = () => {
   const page = {
     title: 'Simple Plans for Growing Teams',
     eyebrow: 'Pricing',
-    summary: 'Choose a package based on team size and workflow needs. Pricing content is served by the public backend so the website and sales pages stay aligned.',
+    summary: 'Choose a package based on team size and workflow needs. Every plan includes the mobile app, admin portal and onboarding support.',
   };
 
   return (

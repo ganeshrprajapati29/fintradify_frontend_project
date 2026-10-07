@@ -168,7 +168,7 @@ const DocumentSubmission = ({ isAdmin = false }) => {
         <div>
           <p className="document-eyebrow">{isAdmin ? 'Document review' : 'Employee documents'}</p>
           <h2 className="document-title">{isAdmin ? 'Document Submissions' : 'Submit Documents'}</h2>
-          <p className="document-subtitle">{isAdmin ? 'Review employee uploads, download files, approve or reject submitted documents.' : 'Upload required HR documents securely. Files are stored on Cloudinary and tracked by HR.'}</p>
+          <p className="document-subtitle">{isAdmin ? 'Review employee uploads, download files, approve or reject submitted documents.' : 'Upload required HR documents securely. HR reviews every file you submit.'}</p>
         </div>
         <Button className="document-action-btn" variant="outline-primary" onClick={fetchData} disabled={loading}>Refresh</Button>
       </section>

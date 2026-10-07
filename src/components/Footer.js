@@ -9,7 +9,6 @@ const groups = {
     ['Features', '/features'],
     ['Pricing', '/pricing'],
     ['Integrations', '/integrations'],
-    ['API', '/api'],
   ],
   Company: [
     ['About', '/about'],

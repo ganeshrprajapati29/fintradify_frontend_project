@@ -312,7 +312,7 @@ const Notification = ({ userId, role }) => {
         <div>
           <p className="notification-eyebrow">{role === 'admin' ? 'Admin alerts' : 'Employee alerts'}</p>
           <h2 className="notification-title">Notifications</h2>
-          <p className="notification-subtitle">Real-time HR, attendance, leave, salary, and system updates from the backend.</p>
+          <p className="notification-subtitle">Real-time HR, attendance, leave, salary, and company updates.</p>
         </div>
         <Button className="notification-action-btn" variant="outline-primary" onClick={markAllVisibleAsRead} disabled={loading || summary.unread === 0}>
           Mark Visible Read

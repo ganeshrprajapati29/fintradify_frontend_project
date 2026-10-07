@@ -33,6 +33,8 @@ import AdminReimbursement from './AdminReimbursement';
 import Notification from './Notification';
 import EmployeeTeams from './EmployeeTeams';
 import EmployeeTracking from './EmployeeTracking';
+import AttendanceApprovals from './AttendanceApprovals';
+import DashboardLiveOps from './DashboardLiveOps';
 import RelievingLetter from './RelievingLetter';
 import OfferLetter from './OfferLetter';
 import CertificateManager from './CertificateManager';
@@ -61,6 +63,7 @@ const ADMIN_TABS = [
   'teams',
   'tracking',
   'attendance',
+  'attendance-approvals',
   'manual-attendance',
   'active-attendance',
   'leaves',
@@ -93,6 +96,7 @@ const TAB_LABELS = {
   teams: 'Teams',
   tracking: 'Live Tracking',
   attendance: 'Attendance',
+  'attendance-approvals': 'Attendance Approvals',
   'manual-attendance': 'Manual Attendance',
   'active-attendance': 'Active Attendance',
   leaves: 'Leave Requests',
@@ -117,7 +121,7 @@ const TAB_LABELS = {
 const ADMIN_NAV_GROUPS = [
   { title: 'Overview', items: ['overview', 'reports-center'] },
   { title: 'People', items: ['add-employee', 'edit-employee', 'employee-list', 'block-employees', 'unblock-employees', 'teams', 'tracking'] },
-  { title: 'Attendance & Leave', items: ['attendance', 'manual-attendance', 'active-attendance', 'leaves', 'paid-leaves', 'wfh', 'attendance-radius', 'shifts'] },
+  { title: 'Attendance & Leave', items: ['attendance', 'attendance-approvals', 'manual-attendance', 'active-attendance', 'leaves', 'paid-leaves', 'wfh', 'attendance-radius', 'shifts'] },
   { title: 'Work & Payroll', items: ['monthly-performance', 'tasks', 'salary', 'reimbursements'] },
   { title: 'HR Documents', items: ['relieving-letter', 'offer-letter', 'certificates', 'documents', 'compliance-center'] },
   { title: 'System', items: ['notifications', 'login-credentials', 'settings'] },
@@ -129,6 +133,7 @@ const renderAdminNavIcon = (tab) => (
     {tab === 'reports-center' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 19h16M7 16V9m5 7V5m5 11v-4M6 5h12" />}
     {['add-employee', 'edit-employee', 'employee-list', 'block-employees', 'unblock-employees', 'teams'].includes(tab) && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m4 6v-2a4 4 0 00-8 0v2m12-10a4 4 0 11-8 0 4 4 0 018 0zm6 1a3 3 0 11-6 0 3 3 0 016 0z" />}
     {tab === 'tracking' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 11a3 3 0 100-6 3 3 0 000 6zm0 10s7-4.5 7-11a7 7 0 10-14 0c0 6.5 7 11 7 11z" />}
+    {tab === 'attendance-approvals' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4M8 7V3m8 4V3M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />}
     {['attendance', 'manual-attendance', 'active-attendance', 'leaves', 'paid-leaves'].includes(tab) && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3M5 11h14M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />}
     {tab === 'wfh' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7m-9 11v-6h4v6m5-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-8 0H6a1 1 0 01-1-1V10" />}
     {tab === 'shifts' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />}
@@ -2026,12 +2031,15 @@ const AdminDashboard = () => {
                   </div>
                   <div className="admin-hero-actions">
                     <button type="button" className="admin-action-btn" onClick={() => handleTabClick('add-employee')}>Add Employee</button>
-                    <button type="button" className="admin-action-btn" onClick={() => handleTabClick('attendance')}>Attendance</button>
+                    <button type="button" className="admin-action-btn" onClick={() => handleTabClick('attendance-approvals')}>Approve Attendance</button>
+                    <button type="button" className="admin-action-btn" onClick={() => handleTabClick('tracking')}>Live Tracking</button>
                     <button type="button" className="admin-action-btn" onClick={() => handleTabClick('leaves')}>Review Leaves</button>
                     <button type="button" className="admin-action-btn" onClick={() => handleTabClick('wfh')}>Review WFH</button>
                     <button type="button" className="admin-action-btn" onClick={() => handleTabClick('tasks')}>Assign Tasks</button>
                   </div>
                 </section>
+
+                <DashboardLiveOps onNavigate={handleTabClick} />
 
                 <section className="admin-kpi-grid">
                   <div className="admin-kpi-card" style={{ '--accent': '#bfdbfe' }}>
@@ -2435,6 +2443,11 @@ const AdminDashboard = () => {
                   <EmployeeTeams />
                 </Card.Body>
               </Card>
+            )}
+            {activeTab === 'attendance-approvals' && (
+              <div className="animate__animated animate__fadeInUp">
+                <AttendanceApprovals />
+              </div>
             )}
             {activeTab === 'tracking' && (
               <Card className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.25s' }}>

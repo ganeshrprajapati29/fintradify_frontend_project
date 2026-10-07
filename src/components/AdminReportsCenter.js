@@ -355,7 +355,7 @@ const AdminReportsCenter = ({ onNavigate }) => {
         <div>
           <p className="reports-eyebrow">Dynamic admin reports</p>
           <h2>Reports Center</h2>
-          <p>Live HR summary for employees, attendance, tasks, leave, payroll, and reimbursements using current backend records.</p>
+          <p>Live HR summary for employees, attendance, tasks, leave, payroll, and reimbursements, always up to date.</p>
         </div>
         <div className="reports-export-panel">
           <div className="reports-range">
