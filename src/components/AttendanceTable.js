@@ -46,6 +46,8 @@ const AttendanceTable = ({ isEmployee }) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [employees, setEmployees] = useState([]); // admin: employee filter options
+  const [employeeFilter, setEmployeeFilter] = useState('');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
@@ -67,8 +69,37 @@ const AttendanceTable = ({ isEmployee }) => {
     if (statusFilter !== 'all') {
       params.status = statusFilter;
     }
+    if (!isEmployee && employeeFilter) {
+      params.employee = employeeFilter;
+    }
     return params;
-  }, [page, limit, startDate, endDate, statusFilter]);
+  }, [page, limit, startDate, endDate, statusFilter, employeeFilter, isEmployee]);
+
+  // Admin: the employee list for the "Employee" filter.
+  useEffect(() => {
+    if (isEmployee) return;
+    api.get('/employees')
+      .then((response) => {
+        const list = Array.isArray(response.data) ? response.data : response.data?.data || [];
+        setEmployees(list
+          .filter((emp) => emp.role !== 'admin')
+          .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''))));
+      })
+      .catch(() => setEmployees([]));
+  }, [isEmployee]);
+
+  const selectedEmployee = employees.find((emp) => emp._id === employeeFilter) || null;
+
+  const setRange = (from, to) => {
+    setStartDate(from);
+    setEndDate(to);
+    setPage(1);
+  };
+  const thisMonth = () => setRange(moment().startOf('month').format('YYYY-MM-DD'), moment().format('YYYY-MM-DD'));
+  const lastMonth = () => setRange(
+    moment().subtract(1, 'month').startOf('month').format('YYYY-MM-DD'),
+    moment().subtract(1, 'month').endOf('month').format('YYYY-MM-DD')
+  );
 
   const fetchPunchStatus = async () => {
     if (!isEmployee) return;
@@ -131,6 +162,7 @@ const AttendanceTable = ({ isEmployee }) => {
     setStartDate('');
     setEndDate('');
     setStatusFilter('all');
+    setEmployeeFilter('');
     setPage(1);
     setSuccess('');
   };
@@ -181,13 +213,18 @@ const AttendanceTable = ({ isEmployee }) => {
   };
 
   const handleDownload = async () => {
-    if (!startDate || !endDate) {
+    if ((startDate && !endDate) || (!startDate && endDate)) {
       setError('Please select both start and end dates before downloading.');
       return;
     }
+    // No dates chosen: this month up to today.
+    const from = startDate || moment().startOf('month').format('YYYY-MM-DD');
+    const to = endDate || moment().format('YYYY-MM-DD');
     try {
       const downloadEndpoint = isEmployee ? '/attendance/download/my-attendance' : '/attendance/download';
-      const name = await downloadReport(downloadEndpoint, { startDate, endDate }, `attendance-report-${startDate}-to-${endDate}.csv`);
+      const params = { startDate: from, endDate: to };
+      if (!isEmployee && employeeFilter) params.employee = employeeFilter;
+      const name = await downloadReport(downloadEndpoint, params, `attendance-report-${from}-to-${to}.csv`);
       setSuccess(`Attendance report downloaded: ${name}`);
       setError('');
     } catch (err) {
@@ -555,9 +592,9 @@ const AttendanceTable = ({ isEmployee }) => {
       <section className="attendance-hero">
         <div>
           <p className="attendance-eyebrow">{isEmployee ? 'Employee attendance' : 'Attendance management'}</p>
-          <h2 className="attendance-title">{isEmployee ? 'My Attendance' : 'All Attendance Records'}</h2>
+          <h2 className="attendance-title">{isEmployee ? 'My Attendance' : selectedEmployee ? `Attendance of ${selectedEmployee.name}` : 'All Attendance Records'}</h2>
           <p className="attendance-subtitle">
-            {total.toLocaleString('en-IN')} records found. Use date filters for precise reports and CSV export.
+            {total.toLocaleString('en-IN')} records found{selectedEmployee ? ` for ${selectedEmployee.employeeId || selectedEmployee.name}` : ''}. Use the filters for precise reports and CSV export.
           </p>
         </div>
         {isEmployee && (
@@ -601,6 +638,30 @@ const AttendanceTable = ({ isEmployee }) => {
       <section className="attendance-filter-panel">
         <Form onSubmit={handleFilter} className="attendance-toolbar">
           <Row className="g-3">
+            {!isEmployee && (
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label>Employee</Form.Label>
+                  <Form.Select value={employeeFilter} onChange={(event) => { setEmployeeFilter(event.target.value); setPage(1); }}>
+                    <option value="">All employees</option>
+                    {employees.map((emp) => (
+                      <option key={emp._id} value={emp._id}>{emp.name} ({emp.employeeId || 'no ID'}){emp.status && emp.status !== 'active' ? ` - ${emp.status}` : ''}</option>
+                    ))}
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+            )}
+            <Col md={isEmployee ? 12 : 6}>
+              <Form.Group>
+                <Form.Label>Quick period</Form.Label>
+                <div className="d-flex flex-wrap gap-2">
+                  <Button type="button" size="sm" variant="outline-primary" onClick={thisMonth}>This month</Button>
+                  <Button type="button" size="sm" variant="outline-primary" onClick={lastMonth}>Last month</Button>
+                  <Button type="button" size="sm" variant="outline-secondary" onClick={() => setRange(moment().format('YYYY-MM-DD'), moment().format('YYYY-MM-DD'))}>Today</Button>
+                  <Button type="button" size="sm" variant="outline-secondary" onClick={() => setRange('', '')}>All dates</Button>
+                </div>
+              </Form.Group>
+            </Col>
             <Col md={3}>
               <Form.Group>
                 <Form.Label>Start Date</Form.Label>
@@ -636,7 +697,7 @@ const AttendanceTable = ({ isEmployee }) => {
           <div className="attendance-actions">
             <Button type="submit" className="attendance-button" variant="primary">Apply</Button>
             <Button type="button" className="attendance-button" variant="outline-secondary" onClick={handleClear}>Clear</Button>
-            <Button type="button" className="attendance-button" variant="outline-primary" onClick={handleDownload}>Download CSV</Button>
+            <Button type="button" className="attendance-button" variant="outline-primary" onClick={handleDownload}>{!isEmployee && selectedEmployee ? `Download ${selectedEmployee.name.split(' ')[0]}'s report (CSV)` : 'Download CSV'}</Button>
           </div>
         </Form>
       </section>

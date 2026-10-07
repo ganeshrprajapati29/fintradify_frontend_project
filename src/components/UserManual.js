@@ -118,7 +118,8 @@ const ADMIN_CHAPTERS = [
     tab: 'attendance',
     summary: 'All punch records with filters. From here you can download the complete monthly attendance report for HR and payroll.',
     steps: [
-      'Filter by date range and status (pending, approved, rejected) to find records.',
+      'Filter by date range and status (pending, approved, rejected) to find records. Use "This month", "Last month" or "Today" for a quick period.',
+      'To see one person only, choose them in the Employee filter. The page then shows just their attendance, and the download button gives the report for that employee alone.',
       'To download the report: choose Start date and End date (up to 92 days, usually the 1st to the last day of the month), then click Download CSV. It opens directly in Excel or Google Sheets.',
       'The same report is available from Overview → Reports Center.',
     ],
@@ -180,7 +181,10 @@ const ADMIN_CHAPTERS = [
       'Create a shift with start time, end time, grace minutes (late allowed), early-out grace, break and working days.',
       'A shift whose end time is earlier than its start time (for example 22:00 to 06:00) is an overnight shift. The whole night counts as the day it started.',
       'Mark one shift as Default. Employees without their own shift follow it.',
-      'Click "Assign employees" on a shift card to give it to one or many employees at once.',
+      'Click "Assign employees" on a shift card to give it to one or many employees at once. Turn on "Keep their other shifts too" to add this shift without removing the ones they already have.',
+      'Multiple shifts for one employee: in the Employee shift roster click "Change shifts" and tick every shift they work. The shift nearest to the punch time is used, and each shift gets its own attendance, so one person can work two shifts in a day.',
+      'When you change a shift time, choose how far back late marks should be updated: from today, from the 1st of this month, or not at all. The dashboard, approvals and reports then show late by the new time.',
+      '"Update late marks" (top of the page) re-checks saved attendance against the current shift timings from any date you pick.',
     ],
     tips: [
       'Late = punch-in after start time + grace minutes. Punching in after the shift has already ended is treated as working outside shift hours, not as late.',

@@ -22,6 +22,14 @@ const durationText = (start, end) => {
   return `${Math.floor(minutes / 60)}h${minutes % 60 ? ` ${minutes % 60}m` : ''}`;
 };
 
+// Shift ids of an employee, primary first (older records only have `shift`).
+const idsOf = (emp) => (Array.isArray(emp.shifts) && emp.shifts.length
+  ? emp.shifts.map((id) => String(id))
+  : emp.shift ? [String(emp.shift)] : []);
+
+const todayKey = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+const monthStartKey = () => `${todayKey().slice(0, 8)}01`;
+
 const emptyShift = {
   name: '', code: '', startTime: '09:00', endTime: '18:00', graceMinutes: 15, earlyOutGraceMinutes: 15,
   breakMinutes: 60, workingDays: [1, 2, 3, 4, 5, 6], color: COLORS[0], description: '', isActive: true,
@@ -45,6 +53,12 @@ const ShiftManager = () => {
   const [selected, setSelected] = useState([]);
   const [query, setQuery] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [keepOthers, setKeepOthers] = useState(false); // assign: add to the employee's other shifts
+  const [recalcFrom, setRecalcFrom] = useState('today'); // shift edit: update late marks from
+  const [shiftsFor, setShiftsFor] = useState(null); // employee whose shift list is being edited
+  const [chosen, setChosen] = useState([]);
+  const [recalcOpen, setRecalcOpen] = useState(false);
+  const [recalcDate, setRecalcDate] = useState(monthStartKey());
 
   const load = async () => {
     setLoading(true);
@@ -65,7 +79,11 @@ const ShiftManager = () => {
   }, []);
 
   const defaultShift = shifts.find((shift) => shift.isDefault);
-  const shiftOf = (emp) => shifts.find((shift) => shift._id === String(emp.shift || '')) || defaultShift;
+  // All shifts of an employee; the default shift when none is assigned.
+  const shiftsOf = (emp) => {
+    const own = idsOf(emp).map((id) => shifts.find((shift) => shift._id === id)).filter(Boolean);
+    return own.length ? own : (defaultShift ? [defaultShift] : []);
+  };
 
   const openEditor = (shift) => {
     setEditing(shift || {});
@@ -76,6 +94,7 @@ const ShiftManager = () => {
       isActive: shift.isActive !== false,
     } : emptyShift);
     setFormError('');
+    setRecalcFrom('today');
   };
 
   const saveShift = async (event) => {
@@ -92,6 +111,9 @@ const ShiftManager = () => {
         earlyOutGraceMinutes: Number(form.earlyOutGraceMinutes),
         breakMinutes: Number(form.breakMinutes),
       };
+      if (editing?._id) {
+        payload.recalculateFrom = recalcFrom === 'today' ? todayKey() : recalcFrom === 'month' ? monthStartKey() : 'none';
+      }
       const res = editing?._id ? await api.put(`/shifts/${editing._id}`, payload) : await api.post('/shifts', payload);
       setSuccess(res.data?.message || 'Shift saved');
       setEditing(null);
@@ -119,18 +141,19 @@ const ShiftManager = () => {
 
   const openAssign = (shift) => {
     setAssignFor(shift);
-    setSelected(employees.filter((emp) => String(emp.shift || '') === shift._id).map((emp) => emp._id));
+    setSelected(employees.filter((emp) => idsOf(emp).includes(shift._id)).map((emp) => emp._id));
     setQuery('');
+    setKeepOthers(false);
   };
 
   const saveAssignment = async () => {
-    const current = employees.filter((emp) => String(emp.shift || '') === assignFor._id).map((emp) => emp._id);
+    const current = employees.filter((emp) => idsOf(emp).includes(assignFor._id)).map((emp) => emp._id);
     const toAdd = selected.filter((id) => !current.includes(id));
     const toRemove = current.filter((id) => !selected.includes(id));
     setSaving(true);
     try {
-      if (toAdd.length) await api.post(`/shifts/${assignFor._id}/assign`, { employeeIds: toAdd });
-      if (toRemove.length) await api.post('/shifts/unassign', { employeeIds: toRemove });
+      if (toAdd.length) await api.post(`/shifts/${assignFor._id}/assign`, { employeeIds: toAdd, mode: keepOthers ? 'add' : 'replace' });
+      if (toRemove.length) await api.post(`/shifts/${assignFor._id}/remove`, { employeeIds: toRemove });
       setSuccess(`${assignFor.name}: ${toAdd.length} added, ${toRemove.length} removed`);
       setAssignFor(null);
       await load();
@@ -140,6 +163,25 @@ const ShiftManager = () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const openShiftsFor = (emp) => {
+    setShiftsFor(emp);
+    setChosen(idsOf(emp));
+  };
+
+  // Keeps the order of ticking: the first shift is the primary one.
+  const toggleChosen = (id) => setChosen((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  const saveEmployeeShifts = async () => {
+    const emp = shiftsFor;
+    setShiftsFor(null);
+    await run(() => api.put(`/shifts/employee/${emp._id}`, { shiftIds: chosen }), 'Shifts updated');
+  };
+
+  const runRecalculate = async () => {
+    setRecalcOpen(false);
+    await run(() => api.post('/shifts/recalculate', { from: recalcDate }), 'Late marks updated');
   };
 
   const filteredEmployees = useMemo(() => {
@@ -165,9 +207,13 @@ const ShiftManager = () => {
             <p className="text-muted small mb-0">
               Create day, evening and night shifts and assign employees. Late marks, punch-out reminders and
               auto-close follow each employee's shift. Night shifts that end the next morning are handled as one attendance.
+              An employee can have more than one shift: the shift nearest to the punch time is used, with one attendance per shift.
             </p>
           </div>
-          <Button onClick={() => openEditor(null)}>+ New shift</Button>
+          <div className="d-flex flex-wrap gap-2">
+            <Button variant="outline-primary" onClick={() => setRecalcOpen(true)}>Update late marks</Button>
+            <Button onClick={() => openEditor(null)}>+ New shift</Button>
+          </div>
         </div>
       </Card>
 
@@ -249,11 +295,12 @@ const ShiftManager = () => {
           <div className="table-responsive">
             <Table hover className="align-middle mb-0">
               <thead>
-                <tr><th>Employee</th><th>Shift</th><th>Timing</th><th style={{ minWidth: 200 }}>Change shift</th></tr>
+                <tr><th>Employee</th><th>Shifts</th><th>Timing</th><th style={{ width: 150 }} /></tr>
               </thead>
               <tbody>
                 {employees.map((emp) => {
-                  const shift = shiftOf(emp);
+                  const list = shiftsOf(emp);
+                  const own = idsOf(emp).length > 0;
                   return (
                     <tr key={emp._id}>
                       <td>
@@ -261,32 +308,22 @@ const ShiftManager = () => {
                         <div className="small text-muted">{emp.employeeId} · {emp.position || emp.department || 'Employee'}</div>
                       </td>
                       <td>
-                        {shift ? (
-                          <Badge bg="" style={{ background: `${shift.color}1a`, color: shift.color }}>
-                            {shift.name}{!emp.shift ? ' (default)' : ''}
-                          </Badge>
-                        ) : '—'}
-                      </td>
-                      <td className="small">{shift ? `${to12h(shift.startTime)} – ${to12h(shift.endTime)}` : '—'}</td>
-                      <td>
-                        <Form.Select
-                          size="sm"
-                          value={emp.shift ? String(emp.shift) : ''}
-                          onChange={(event) => {
-                            const value = event.target.value;
-                            run(
-                              () => (value
-                                ? api.post(`/shifts/${value}/assign`, { employeeIds: [emp._id] })
-                                : api.post('/shifts/unassign', { employeeIds: [emp._id] })),
-                              'Shift updated'
-                            );
-                          }}
-                        >
-                          <option value="">Default shift{defaultShift ? ` (${defaultShift.name})` : ''}</option>
-                          {shifts.filter((s) => s.isActive).map((s) => (
-                            <option key={s._id} value={s._id}>{s.name} · {to12h(s.startTime)}–{to12h(s.endTime)}</option>
+                        <div className="d-flex flex-wrap gap-1">
+                          {list.map((shift, index) => (
+                            <Badge key={shift._id} bg="" style={{ background: `${shift.color}1a`, color: shift.color }}>
+                              {shift.name}{!own ? ' (default)' : list.length > 1 && index === 0 ? ' · primary' : ''}
+                            </Badge>
                           ))}
-                        </Form.Select>
+                          {list.length === 0 && '—'}
+                        </div>
+                      </td>
+                      <td className="small">
+                        {list.map((shift) => <div key={shift._id}>{to12h(shift.startTime)} – {to12h(shift.endTime)}</div>)}
+                      </td>
+                      <td className="text-end">
+                        <Button size="sm" variant="outline-primary" onClick={() => openShiftsFor(emp)}>
+                          {list.length > 1 ? `Edit shifts (${list.length})` : 'Change shifts'}
+                        </Button>
                       </td>
                     </tr>
                   );
@@ -296,6 +333,63 @@ const ShiftManager = () => {
           </div>
         </Card>
       )}
+
+      {/* Shifts of one employee */}
+      <Modal show={Boolean(shiftsFor)} onHide={() => setShiftsFor(null)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title style={{ fontSize: '1.05rem' }}>Shifts of {shiftsFor?.name}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="small text-muted">
+            Tick every shift this employee works. With more than one, the shift nearest to the punch time is used and each shift
+            gets its own attendance, so the same person can work two shifts in a day. Leave all unticked to follow the default shift.
+          </p>
+          {shifts.filter((shift) => shift.isActive).map((shift) => {
+            const position = chosen.indexOf(shift._id);
+            return (
+              <Form.Check
+                key={shift._id}
+                type="checkbox"
+                id={`emp-shift-${shift._id}`}
+                className="py-1"
+                checked={position >= 0}
+                onChange={() => toggleChosen(shift._id)}
+                label={(
+                  <span>
+                    <span className="fw-semibold" style={{ color: shift.color }}>{shift.name}</span>{' '}
+                    <span className="small text-muted">{to12h(shift.startTime)} – {to12h(shift.endTime)}{shift.isOvernight ? ' (next day)' : ''}</span>
+                    {position === 0 && chosen.length > 1 && <Badge bg="primary" className="ms-2">Primary</Badge>}
+                  </span>
+                )}
+              />
+            );
+          })}
+        </Modal.Body>
+        <Modal.Footer>
+          <span className="small text-muted me-auto">{chosen.length ? `${chosen.length} shift(s) selected` : `Default shift${defaultShift ? ` (${defaultShift.name})` : ''}`}</span>
+          <Button variant="light" onClick={() => setShiftsFor(null)}>Cancel</Button>
+          <Button onClick={saveEmployeeShifts}>Save</Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Update late marks */}
+      <Modal show={recalcOpen} onHide={() => setRecalcOpen(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title style={{ fontSize: '1.05rem' }}>Update late marks</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="small text-muted">
+            Checks saved attendance again using the shift timings as they are now. Late, early-out and overtime are corrected
+            from the date you choose. Use this after changing a shift time or moving employees to another shift.
+          </p>
+          <Form.Label>Update attendance from</Form.Label>
+          <Form.Control type="date" value={recalcDate} max={todayKey()} onChange={(e) => setRecalcDate(e.target.value)} />
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="light" onClick={() => setRecalcOpen(false)}>Cancel</Button>
+          <Button onClick={runRecalculate} disabled={!recalcDate}>Update</Button>
+        </Modal.Footer>
+      </Modal>
 
       {/* Create / edit shift */}
       <Modal show={Boolean(editing)} onHide={() => !saving && setEditing(null)} centered size="lg">
@@ -368,6 +462,17 @@ const ShiftManager = () => {
                 <Form.Label>Description (optional)</Form.Label>
                 <Form.Control value={form.description} maxLength={240} onChange={(e) => setForm({ ...form, description: e.target.value })} />
               </Col>
+              {editing?._id && (
+                <Col xs={12}>
+                  <Form.Label>If the timing changes, update late marks</Form.Label>
+                  <Form.Select value={recalcFrom} onChange={(e) => setRecalcFrom(e.target.value)}>
+                    <option value="today">From today (recommended)</option>
+                    <option value="month">From the 1st of this month</option>
+                    <option value="none">Do not change saved attendance</option>
+                  </Form.Select>
+                  <div className="small text-muted mt-1">Late, early-out and overtime are worked out again with the new time, so the dashboard and reports match it.</div>
+                </Col>
+              )}
               {editing?._id && !editing.isDefault && (
                 <Col xs={12}>
                   <Form.Check type="switch" id="shift-active" label="Shift is active" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} />
@@ -394,8 +499,16 @@ const ShiftManager = () => {
             <Button size="sm" variant="outline-secondary" onClick={() => setSelected([])}>Clear</Button>
             <span className="small text-muted ms-auto align-self-center">{selected.length} selected</span>
           </div>
+          <Form.Check
+            type="switch"
+            id="shift-keep-others"
+            className="mb-2"
+            label="Keep their other shifts too (multiple shifts)"
+            checked={keepOthers}
+            onChange={(e) => setKeepOthers(e.target.checked)}
+          />
           {filteredEmployees.map((emp) => {
-            const current = shiftOf(emp);
+            const current = shiftsOf(emp).map((shift) => shift.name).join(' + ');
             return (
               <Form.Check
                 key={emp._id}
@@ -407,7 +520,7 @@ const ShiftManager = () => {
                 label={(
                   <span>
                     <span className="fw-semibold">{emp.name}</span>{' '}
-                    <span className="small text-muted">{emp.employeeId} · now: {current?.name || 'Default'}</span>
+                    <span className="small text-muted">{emp.employeeId} · now: {current || 'Default'}</span>
                   </span>
                 )}
               />
@@ -428,7 +541,7 @@ const ShiftManager = () => {
         </Modal.Header>
         <Modal.Body>
           {confirmDelete?.assignedCount
-            ? `${confirmDelete.assignedCount} employee(s) in this shift will move to the default shift.`
+            ? `${confirmDelete.assignedCount} employee(s) will lose this shift. Anyone left with no shift follows the default shift.`
             : 'No employees are assigned to this shift.'}{' '}
           Past attendance keeps its shift details.
         </Modal.Body>
