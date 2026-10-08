@@ -41,7 +41,11 @@ const getMonthLabel = (month) => {
 };
 
 const SalarySlip = ({ isAdmin }) => {
-  const [formData, setFormData] = useState({ employeeId: '', month: moment().format('YYYY-MM'), fixedAmount: '' });
+  const [formData, setFormData] = useState({ employeeId: '', month: moment().format('YYYY-MM'), fixedAmount: '', otherAllowances: '', otherDeductions: '' });
+  const [payMode, setPayMode] = useState('attendance'); // 'attendance' | 'fixed'
+  const [calc, setCalc] = useState(null);
+  const [calcLoading, setCalcLoading] = useState(false);
+  const [calcError, setCalcError] = useState('');
   const [slips, setSlips] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [error, setError] = useState('');
@@ -57,6 +61,10 @@ const SalarySlip = ({ isAdmin }) => {
 
   const selectedEmployee = employees.find((employee) => employee._id === formData.employeeId);
   const fixedAmount = Number(formData.fixedAmount || 0);
+  const otherAllowances = Number(formData.otherAllowances || 0);
+  const otherDeductions = Number(formData.otherDeductions || 0);
+  const attendanceNet = calc ? Math.max(0, calc.netSalary + otherAllowances - otherDeductions) : 0;
+  const previewNet = payMode === 'attendance' ? attendanceNet : fixedAmount;
 
   const fetchSlips = async () => {
     const url = isAdmin ? '/salary' : '/salary/my-slips';
@@ -124,24 +132,47 @@ const SalarySlip = ({ isAdmin }) => {
     setPage(1);
   }, [search, monthFilter, statusFilter, limit]);
 
+  // Salary worked out from attendance for the chosen employee and month.
+  useEffect(() => {
+    if (!isAdmin || payMode !== 'attendance' || !formData.employeeId || !formData.month) {
+      setCalc(null);
+      setCalcError('');
+      return undefined;
+    }
+    let cancelled = false;
+    setCalcLoading(true);
+    api.get('/salary/calculate', { params: { employeeId: formData.employeeId, month: formData.month } })
+      .then((res) => { if (!cancelled) { setCalc(res.data?.data || null); setCalcError(''); } })
+      .catch((err) => { if (!cancelled) { setCalc(null); setCalcError(err.response?.data?.message || 'Could not calculate salary from attendance'); } })
+      .finally(() => { if (!cancelled) setCalcLoading(false); });
+    return () => { cancelled = true; };
+  }, [isAdmin, payMode, formData.employeeId, formData.month]);
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!isAdmin) {
       setError('Only admins can generate salary slips');
       return;
     }
-    if (!formData.employeeId || !formData.month || fixedAmount <= 0) {
-      setError('Please select employee, month, and a valid salary amount.');
+    if (!formData.employeeId || !formData.month || previewNet <= 0) {
+      setError(payMode === 'attendance'
+        ? 'Please select employee and month. The employee needs a monthly salary in their profile.'
+        : 'Please select employee, month, and a valid salary amount.');
+      return;
+    }
+    if (payMode === 'attendance' && calc?.existingSlip) {
+      setError('A salary slip already exists for this employee and month.');
       return;
     }
 
     setSubmitting(true);
     try {
-      const response = await api.post('/salary', {
-        ...formData,
-        fixedAmount,
-      });
-      setFormData({ employeeId: '', month: moment().format('YYYY-MM'), fixedAmount: '' });
+      const payload = payMode === 'attendance'
+        ? { employeeId: formData.employeeId, month: formData.month, useAttendance: true, otherAllowances, otherDeductions }
+        : { employeeId: formData.employeeId, month: formData.month, fixedAmount };
+      const response = await api.post('/salary', payload);
+      setFormData({ employeeId: '', month: moment().format('YYYY-MM'), fixedAmount: '', otherAllowances: '', otherDeductions: '' });
+      setCalc(null);
       await fetchSlips();
       setSuccess(response.data?.message || 'Salary slip generated successfully');
       setError('');
@@ -600,26 +631,77 @@ const SalarySlip = ({ isAdmin }) => {
                 </Col>
                 <Col md={6}>
                   <Form.Group>
-                    <Form.Label>Fixed Amount</Form.Label>
-                    <Form.Control
-                      type="number"
-                      name="fixedAmount"
-                      value={formData.fixedAmount}
-                      onChange={handleChange}
-                      required
-                      min="1"
-                      step="0.01"
-                      placeholder="Enter amount"
-                    />
+                    <Form.Label>Salary based on</Form.Label>
+                    <Form.Select value={payMode} onChange={(event) => setPayMode(event.target.value)}>
+                      <option value="attendance">Attendance (recommended)</option>
+                      <option value="fixed">Fixed amount</option>
+                    </Form.Select>
                   </Form.Group>
                 </Col>
+                {payMode === 'fixed' ? (
+                  <Col xs={12}>
+                    <Form.Group>
+                      <Form.Label>Fixed Amount</Form.Label>
+                      <Form.Control
+                        type="number"
+                        name="fixedAmount"
+                        value={formData.fixedAmount}
+                        onChange={handleChange}
+                        required
+                        min="1"
+                        step="0.01"
+                        placeholder="Enter amount"
+                      />
+                    </Form.Group>
+                  </Col>
+                ) : (
+                  <>
+                    <Col md={6}>
+                      <Form.Group>
+                        <Form.Label>Other allowance (optional)</Form.Label>
+                        <Form.Control type="number" name="otherAllowances" min="0" step="0.01" value={formData.otherAllowances} onChange={handleChange} placeholder="0" />
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group>
+                        <Form.Label>Other deduction (optional)</Form.Label>
+                        <Form.Control type="number" name="otherDeductions" min="0" step="0.01" value={formData.otherDeductions} onChange={handleChange} placeholder="0" />
+                      </Form.Group>
+                    </Col>
+                  </>
+                )}
               </Row>
+
+              {payMode === 'attendance' && formData.employeeId && (
+                <div className="salary-preview" style={{ marginBottom: 12 }}>
+                  {calcLoading && <div className="small text-muted">Working out salary from attendance…</div>}
+                  {calcError && <div className="small text-danger">{calcError}</div>}
+                  {calc && !calcLoading && (
+                    <>
+                      <div className="salary-preview-row"><span>Monthly salary</span><strong>{money(calc.monthlySalary)}</strong></div>
+                      <div className="salary-preview-row"><span>Days in month / payable</span><strong>{calc.daysInMonth} / {calc.payableDays}</strong></div>
+                      <div className="salary-preview-row"><span>Present · WFH · half day</span><strong>{calc.present} · {calc.wfh} · {calc.halfDays}</strong></div>
+                      <div className="salary-preview-row"><span>Leave · LWP · absent</span><strong>{calc.paidLeave} · {calc.leaveWithoutPay} · {calc.absent}</strong></div>
+                      <div className="salary-preview-row"><span>Weekly off · holiday</span><strong>{calc.weeklyOff} · {calc.holidays}</strong></div>
+                      <div className="salary-preview-row"><span>Sessions · extra shifts</span><strong>{calc.sessions} · {calc.extraSessions} ({calc.extraHours} h)</strong></div>
+                      <div className="salary-preview-row"><span>Extra shift pay</span><strong style={{ color: '#15803d' }}>+ {money(calc.extraShiftPay)}</strong></div>
+                      <div className="salary-preview-row"><span>Loss of pay ({calc.unpaidDays} day{calc.unpaidDays === 1 ? '' : 's'})</span><strong style={{ color: '#b91c1c' }}>- {money(calc.lossOfPay)}</strong></div>
+                      {!calc.monthComplete && <div className="small" style={{ color: '#b45309' }}>This month is not over yet: remaining days are counted as paid. Generate the slip after the month ends for the final amount.</div>}
+                      {calc.pendingApprovals > 0 && <div className="small" style={{ color: '#b45309' }}>{calc.pendingApprovals} day(s) still pending approval are counted as present.</div>}
+                      {calc.existingSlip && <div className="small text-danger">A slip already exists for this month.</div>}
+                    </>
+                  )}
+                </div>
+              )}
 
               <div className="salary-preview">
                 <div className="salary-preview-row"><span>Employee</span><strong>{selectedEmployee ? `${selectedEmployee.name} (${selectedEmployee.employeeId})` : 'Not selected'}</strong></div>
                 <div className="salary-preview-row"><span>Period</span><strong>{getMonthLabel(formData.month)}</strong></div>
-                <div className="salary-preview-row"><span>Gross earnings</span><strong>{money(fixedAmount)}</strong></div>
-                <div className="salary-preview-row"><span>Net salary</span><strong>{money(fixedAmount)}</strong></div>
+                {payMode === 'attendance' && calc && (
+                  <div className="salary-preview-row"><span>Gross earnings</span><strong>{money(calc.totalEarnings + otherAllowances)}</strong></div>
+                )}
+                {payMode === 'fixed' && <div className="salary-preview-row"><span>Gross earnings</span><strong>{money(fixedAmount)}</strong></div>}
+                <div className="salary-preview-row"><span>Net salary</span><strong>{money(previewNet)}</strong></div>
               </div>
 
               <Button className="salary-action-btn" variant="primary" type="submit" disabled={submitting || loading}>

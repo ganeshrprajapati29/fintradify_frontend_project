@@ -112,6 +112,9 @@ const AttendanceTable = ({ isEmployee }) => {
       shiftLabel: current.shiftLabel || '',
       isLate: Boolean(current.attendance?.isLate),
       lateMinutes: current.attendance?.lateMinutes || 0,
+      // After the planned shift the next punch-in starts an extra shift.
+      nextIsExtra: Boolean(current.extraShift && current.canPunchIn),
+      session: current.session || 1,
     });
   };
 
@@ -602,7 +605,7 @@ const AttendanceTable = ({ isEmployee }) => {
             <div className="attendance-punch-status">
               <div>
                 <p className="attendance-eyebrow">Today status</p>
-                <strong>{punchStatus.canPunchIn ? 'Ready to punch in' : punchStatus.canPunchOut ? 'Working session active' : 'Punch completed'}</strong>
+                <strong>{punchStatus.nextIsExtra ? 'Shift completed · you can start an extra shift' : punchStatus.canPunchIn ? 'Ready to punch in' : punchStatus.canPunchOut ? 'Working session active' : 'Punch completed'}</strong>
                 {punchStatus.shiftLabel && (
                   <div className="small text-muted mt-1">
                     Shift: {punchStatus.shiftLabel}{punchStatus.isLate ? ` · late by ${punchStatus.lateMinutes} min` : ''}
@@ -615,7 +618,7 @@ const AttendanceTable = ({ isEmployee }) => {
             </div>
             <div className="attendance-punch-actions">
               <Button className="attendance-button" variant="success" onClick={() => handlePunch('in')} disabled={!punchStatus.canPunchIn || loading}>
-                Punch In
+                {punchStatus.nextIsExtra ? 'Start Extra Shift' : 'Punch In'}
               </Button>
               <Button className="attendance-button" variant="danger" onClick={() => handlePunch('out')} disabled={!punchStatus.canPunchOut || loading}>
                 Punch Out
@@ -747,7 +750,12 @@ const AttendanceTable = ({ isEmployee }) => {
                       </td>
                     )}
                     <td>{formatDate(attendance.date)}</td>
-                    <td>{formatTime(attendance.punchIn)}</td>
+                    <td>
+                      {formatTime(attendance.punchIn)}
+                      {(attendance.session || 1) > 1 && <div><Badge bg="light" text="dark">Session {attendance.session}</Badge></div>}
+                      {attendance.extraShift && <div><Badge bg="" style={{ background: '#ede9fe', color: '#6d28d9' }}>Extra shift</Badge></div>}
+                      {attendance.isLate && <div><Badge bg="" style={{ background: '#fee2e2', color: '#b91c1c' }}>Late {attendance.lateMinutes || ''}m</Badge></div>}
+                    </td>
                     <td>{formatTime(attendance.punchOut)}</td>
                     <td>{getHoursWorked(attendance)}</td>
                     <td>{renderStatus(attendance.status)}</td>

@@ -272,6 +272,50 @@ const FitBounds = ({ points, fitKey }) => {
   return null;
 };
 
+// Keeps the route-replay marker in view without the long fly animation.
+const PanTo = ({ point }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (point) map.panTo(point, { animate: true, duration: 0.35 });
+  }, [point, map]);
+  return null;
+};
+
+const readTheme = () => {
+  try { return localStorage.getItem('lt-theme') === 'dark' ? 'dark' : 'light'; } catch (e) { return 'light'; }
+};
+
+// Genuineness of a day's route: impossible jumps (fake GPS / bad fix), long gaps and accuracy.
+const checkRoute = (route) => {
+  const pts = (route?.route || []).filter((p) => p.source !== 'punch' && isNum(p.latitude));
+  if (pts.length < 2) return null;
+  const jumps = [];
+  const gaps = [];
+  let accSum = 0;
+  let accN = 0;
+  let poor = 0;
+  pts.forEach((p) => {
+    if (isNum(p.accuracy)) {
+      accSum += Number(p.accuracy);
+      accN += 1;
+      if (Number(p.accuracy) > 100) poor += 1;
+    }
+  });
+  for (let i = 1; i < pts.length; i += 1) {
+    const a = pts[i - 1];
+    const b = pts[i];
+    const seconds = (new Date(b.timestamp) - new Date(a.timestamp)) / 1000;
+    const meters = metersBetween([a.latitude, a.longitude], [b.latitude, b.longitude]);
+    const kmh = seconds > 0 ? (meters / seconds) * 3.6 : Infinity;
+    if (meters > 1000 && kmh > 150) jumps.push({ from: a, to: b, kmh, meters });
+    if (seconds > 30 * 60) gaps.push({ from: a, to: b, minutes: seconds / 60 });
+  }
+  let verdict = 'ok';
+  if (jumps.length) verdict = 'review';
+  else if (gaps.length > 2 || poor / pts.length > 0.3) verdict = 'partial';
+  return { points: pts.length, avgAccuracy: accN ? accSum / accN : null, poor, jumps, gaps, verdict };
+};
+
 const FlyTo = ({ target }) => {
   const map = useMap();
   useEffect(() => {
@@ -305,7 +349,7 @@ const EmployeeTracking = () => {
   const [filter, setFilter] = useState('onduty');
   const [query, setQuery] = useState('');
   const [view, setView] = useState('map');
-  const [mapStyle, setMapStyle] = useState('light');
+  const [mapStyle, setMapStyle] = useState(() => (readTheme() === 'dark' ? 'dark' : 'light'));
   const [showTrails, setShowTrails] = useState(true);
   const [radarRange, setRadarRange] = useState('auto');
   const [customKm, setCustomKm] = useState('');
@@ -324,6 +368,13 @@ const EmployeeTracking = () => {
   const selectedRef = useRef(null);
   const routeDateRef = useRef(todayKey());
   const followRef = useRef(true);
+  const [theme, setTheme] = useState(readTheme);
+  const [presenting, setPresenting] = useState(false);
+  const [tour, setTour] = useState(false);
+  const [replay, setReplay] = useState({ index: -1, playing: false, speed: 1 });
+  const [addresses, setAddresses] = useState({});
+  const pageRef = useRef(null);
+  const tourRef = useRef(-1);
 
   /* ---------------- data ---------------- */
   const fetchRoute = async (employeeId, silent = false, date = routeDateRef.current) => {
@@ -505,6 +556,23 @@ const EmployeeTracking = () => {
   const timeline = useMemo(() => buildTimeline(route?.route || [], route?.events || []), [route]);
   const stays = timeline.filter((item) => item.type === 'stay');
   const movingMinutes = timeline.filter((item) => item.type === 'move').reduce((sum, item) => sum + item.minutes, 0);
+  const routeCheck = useMemo(() => checkRoute(route), [route]);
+  const replayPoint = replay.index >= 0 ? routePoints[Math.min(replay.index, routePoints.length - 1)] : null;
+  const replayRow = replay.index >= 0 ? (route?.route || [])[Math.min(replay.index, (route?.route || []).length - 1)] : null;
+
+  // Route replay: walks the marker along the day's route.
+  useEffect(() => {
+    if (!replay.playing) return undefined;
+    const timer = setInterval(() => {
+      setReplay((prev) => {
+        const last = routePoints.length - 1;
+        if (prev.index >= last) return { ...prev, playing: false };
+        return { ...prev, index: Math.min(last, prev.index + prev.speed) };
+      });
+    }, 400);
+    return () => clearInterval(timer);
+  }, [replay.playing, routePoints.length]);
+  useEffect(() => { setReplay({ index: -1, playing: false, speed: 1 }); }, [selectedId, routeDate]);
 
   const officeLat = office && isNum(office.latitude) ? Number(office.latitude) : null;
   const officeLng = office && isNum(office.longitude) ? Number(office.longitude) : null;
@@ -580,6 +648,46 @@ const EmployeeTracking = () => {
     setFollow(!follow);
   };
 
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    try { localStorage.setItem('lt-theme', next); } catch (e) { /* not stored */ }
+    if (mapStyle !== 'satellite') setMapStyle(next === 'dark' ? 'dark' : 'light');
+  };
+
+  // Client view: full screen, larger map and plain-language legend.
+  const togglePresenting = async () => {
+    const el = pageRef.current;
+    if (!presenting) {
+      setPresenting(true);
+      try { if (el && el.requestFullscreen && !document.fullscreenElement) await el.requestFullscreen(); } catch (e) { /* browser refused; the page view still works */ }
+    } else {
+      setPresenting(false);
+      setTour(false);
+      try { if (document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen(); } catch (e) { /* ignore */ }
+    }
+  };
+
+  useEffect(() => {
+    const onChange = () => { if (!document.fullscreenElement) { setPresenting(false); setTour(false); } };
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+
+  const lookupAddress = async (lat, lng) => {
+    const key = `${Number(lat).toFixed(5)},${Number(lng).toFixed(5)}`;
+    if (addresses[key]) return;
+    setAddresses((prev) => ({ ...prev, [key]: 'Finding address…' }));
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=17&lat=${lat}&lon=${lng}`, { headers: { 'Accept-Language': 'en' } });
+      const data = await res.json();
+      setAddresses((prev) => ({ ...prev, [key]: data.display_name || 'Address not found' }));
+    } catch (e) {
+      setAddresses((prev) => ({ ...prev, [key]: 'Address not found' }));
+    }
+  };
+  const addressOf = (lat, lng) => addresses[`${Number(lat).toFixed(5)},${Number(lng).toFixed(5)}`];
+
   const focusOn = (lat, lng) => {
     if (isNum(lat) && isNum(lng)) setFlyTarget({ point: [Number(lat), Number(lng)], zoom: 17, at: Date.now() });
   };
@@ -589,6 +697,21 @@ const EmployeeTracking = () => {
     ? (routePoints.length ? routePoints : (selected?.info.position ? [selected.info.position] : []))
     : located.map(({ info }) => info.position);
   const tiles = TILES[mapStyle];
+
+  // Auto tour (client view): focuses each on-duty employee in turn.
+  const tourIds = located.filter(({ employee }) => employee.isActive).map(({ employee }) => employee._id).join(',');
+  useEffect(() => {
+    if (!tour) return undefined;
+    const ids = tourIds ? tourIds.split(',') : [];
+    if (!ids.length) return undefined;
+    const next = () => {
+      tourRef.current = (tourRef.current + 1) % ids.length;
+      selectEmployee(ids[tourRef.current]);
+    };
+    next();
+    const timer = setInterval(next, 10000);
+    return () => clearInterval(timer);
+  }, [tour, tourIds]);
 
   const kpis = [
     ['onduty', 'On duty', counts.onduty, '#0a1f8f', `${counts.late} late today`],
@@ -601,7 +724,7 @@ const EmployeeTracking = () => {
 
   /* ---------------- render ---------------- */
   return (
-    <div className="lt-page">
+    <div ref={pageRef} className={`lt-page theme-${theme} ${presenting ? 'lt-present' : ''}`}>
       <style>{radarStyles}</style>
       <style>{`
         .lt-page { display: grid; gap: 14px; color: #0f172a; }
@@ -648,6 +771,38 @@ const EmployeeTracking = () => {
         .lt-stay { width: 24px; height: 24px; border-radius: 50%; background: #0a1f8f; color: #fff; border: 2px solid #fff; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(15,23,42,.35); }
         .lt-radar-card { background: linear-gradient(180deg, #04131f, #020b14); color: #e2e8f0; border-color: #0f2a3d; }
         .lt-radar-card .lt-card-head { border-bottom-color: rgba(255,255,255,.07); }
+        .lt-radar-title { color: #fff; }
+        .lt-radar-sub { font-size: .72rem; color: #86efac; font-family: ui-monospace, Menlo, Consolas, monospace; }
+        .lt-radar-dim { color: #4d7c63; }
+        .lt-radar-card.theme-light { background: linear-gradient(180deg, #ffffff, #f3f6ff); color: #0f172a; border-color: #dbe3ef; }
+        .lt-radar-card.theme-light .lt-card-head { border-bottom-color: #e6e9f2; }
+        .theme-light .lt-radar-title { color: #0a1f8f; }
+        .theme-light .lt-radar-sub { color: #1d4ed8; }
+        .theme-light .lt-radar-dim { color: #64748b; }
+        .theme-light .lt-radar-controls { border-top-color: #e6e9f2; }
+        .theme-light .lt-radar-controls button { border-color: #c7d2fe; color: #1e3a8a; }
+        .theme-light .lt-radar-controls button.active { background: #0a1f8f; border-color: #0a1f8f; color: #fff; }
+        .theme-light .lt-radar-controls input { background: #fff; border-color: #c7d2fe; color: #0f172a; }
+        .theme-light .lt-radar-controls label { color: #64748b; }
+        .theme-light .lt-contacts { border-top-color: #e6e9f2; }
+        .theme-light .lt-contact { color: #334155; }
+        .theme-light .lt-contact:hover, .theme-light .lt-contact.selected { background: #eef2ff; color: #0a1f8f; }
+        .lt-dist { color: #86efac; } .theme-light .lt-dist { color: #15803d; } .lt-dist.far { color: #f87171; }
+        .lt-page.lt-present { position: fixed; inset: 0; z-index: 3000; overflow-y: auto; padding: 18px; background: #eef2f9; }
+        .lt-page.lt-present.theme-dark { background: #020b14; }
+        .lt-present .lt-map { height: calc(100vh - 360px); min-height: 460px; }
+        .lt-guide { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 12px 16px; border-radius: 14px; background: #fff; border: 1px solid #e6e9f2; font-size: .86rem; color: #334155; }
+        .theme-dark .lt-guide { background: #04131f; border-color: #0f2a3d; color: #cbd5e1; }
+        .lt-guide i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+        .lt-guide strong { font-size: .92rem; }
+        .lt-clock { font-size: 1.6rem; font-weight: 800; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+        .lt-check { border-radius: 12px; padding: 10px 12px; font-size: .84rem; border: 1px solid #e6e9f2; background: #f8fafc; }
+        .lt-check.ok { background: #f0fdf4; border-color: #bbf7d0; } .lt-check.partial { background: #fffbeb; border-color: #fde68a; } .lt-check.review { background: #fef2f2; border-color: #fecaca; }
+        .lt-check ul { margin: 6px 0 0; padding-left: 18px; }
+        .lt-check li { cursor: pointer; }
+        .lt-replay { display: grid; grid-template-columns: auto 1fr auto auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; background: #eef2ff; }
+        .lt-replay input[type=range] { width: 100%; accent-color: #0a1f8f; }
+        .lt-addr-btn { border: none; background: none; color: #1d4ed8; font-weight: 700; font-size: .74rem; padding: 0; }
         .lt-radar-wrap { padding: 6px 10px 0; }
         .lt-radar-controls { display: grid; gap: 8px; padding: 10px 14px 12px; border-top: 1px solid rgba(255,255,255,.06); }
         .lt-radar-controls .row-line { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
@@ -705,6 +860,10 @@ const EmployeeTracking = () => {
           <p>Where every employee is, what they are doing and the route they took today.</p>
         </div>
         <div className="d-flex flex-wrap gap-2 align-items-center">
+          {presenting && <span className="lt-clock">{new Date(now).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })}</span>}
+          <button type="button" className="lt-btn ghost" onClick={toggleTheme} title="Switch radar and map theme">{theme === 'dark' ? 'Light theme' : 'Dark theme'}</button>
+          <button type="button" className="lt-btn ghost" onClick={togglePresenting}>{presenting ? 'Exit client view' : 'Client view'}</button>
+          {presenting && <button type="button" className={`lt-btn ghost ${tour ? 'active' : ''}`} onClick={() => setTour(!tour)}>{tour ? 'Stop tour' : 'Auto tour'}</button>}
           <span className="lt-conn">
             <span className={`lt-dot ${liveConnected ? '' : 'off'}`} />
             {liveConnected ? 'Live' : 'Connecting'} · {counts.live} on live GPS
@@ -717,6 +876,18 @@ const EmployeeTracking = () => {
       </section>
 
       {error && <div className="alert alert-danger mb-0">{error}</div>}
+
+      {presenting && (
+        <section className="lt-guide" aria-label="How to read this screen">
+          <strong>How to read this screen:</strong>
+          <span><i style={{ background: STATUS.office.color }} />At office</span>
+          <span><i style={{ background: STATUS.field.color }} />Working on field</span>
+          <span><i style={{ background: STATUS.moving.color }} />Travelling now</span>
+          <span><i style={{ background: STATUS.outside.color }} />Outside allowed area</span>
+          <span><i style={{ background: STATUS.offduty.color }} />Not on duty</span>
+          <span>Pulsing photo = live GPS · lines = route taken · radar centre = office</span>
+        </section>
+      )}
 
       {/* ---------- KPIs (click to filter) ---------- */}
       <section className="lt-kpis">
@@ -799,6 +970,22 @@ const EmployeeTracking = () => {
                             <Tooltip>{formatClock(p.timestamp)}{isNum(p.speed) && p.speed >= 1 ? ` · ${Math.round(p.speed * 3.6)} km/h` : ''}</Tooltip>
                           </CircleMarker>
                         ))}
+                      </>
+                    )}
+                    {/* suspicious jumps */}
+                    {selectedId && routeCheck?.jumps.map((jump) => (
+                      <Polyline key={`jump-${jump.to.timestamp}`} positions={[[jump.from.latitude, jump.from.longitude], [jump.to.latitude, jump.to.longitude]]} pathOptions={{ color: '#f59e0b', weight: 4, dashArray: '8 8' }}>
+                        <Tooltip>Possible fake / wrong GPS: {formatDistance(jump.meters)} in {formatDuration((new Date(jump.to.timestamp) - new Date(jump.from.timestamp)) / 60000)} ({Math.round(jump.kmh)} km/h)</Tooltip>
+                      </Polyline>
+                    ))}
+                    {/* route replay */}
+                    {selectedId && replayPoint && (
+                      <>
+                        <Polyline positions={routePoints.slice(0, replay.index + 1)} pathOptions={{ color: '#2563eb', weight: 5, opacity: 0.95 }} />
+                        <CircleMarker center={replayPoint} radius={9} pathOptions={{ color: '#ffffff', weight: 3, fillColor: '#2563eb', fillOpacity: 1 }}>
+                          <Tooltip permanent direction="top" offset={[0, -10]}>{formatClock(replayRow?.timestamp)}</Tooltip>
+                        </CircleMarker>
+                        {replay.playing && <PanTo point={replayPoint} />}
                       </>
                     )}
                     {selectedId && stays.map((stay, index) => (
@@ -938,6 +1125,56 @@ const EmployeeTracking = () => {
                 )}
                 {routeError && <div className="alert alert-danger mb-0 py-2">{routeError}</div>}
 
+                {routeCheck && (
+                  <div className={`lt-check ${routeCheck.verdict}`}>
+                    <strong>
+                      {routeCheck.verdict === 'ok' && 'Route check: looks genuine'}
+                      {routeCheck.verdict === 'partial' && 'Route check: partly tracked'}
+                      {routeCheck.verdict === 'review' && 'Route check: needs review'}
+                    </strong>
+                    <span className="text-muted"> · {routeCheck.points} GPS points{routeCheck.avgAccuracy !== null ? ` · average accuracy ±${Math.round(routeCheck.avgAccuracy)} m` : ''}{routeCheck.poor ? ` · ${routeCheck.poor} weak fixes` : ''}</span>
+                    {(routeCheck.jumps.length > 0 || routeCheck.gaps.length > 0) && (
+                      <ul>
+                        {routeCheck.jumps.map((jump) => (
+                          <li key={`j-${jump.to.timestamp}`} onClick={() => focusOn(jump.to.latitude, jump.to.longitude)}>
+                            {formatClock(jump.from.timestamp)} → {formatClock(jump.to.timestamp)}: jumped {formatDistance(jump.meters)} ({Math.round(jump.kmh)} km/h) - possible fake location or wrong GPS fix
+                          </li>
+                        ))}
+                        {routeCheck.gaps.map((gap) => (
+                          <li key={`g-${gap.to.timestamp}`} onClick={() => focusOn(gap.from.latitude, gap.from.longitude)}>
+                            {formatClock(gap.from.timestamp)} → {formatClock(gap.to.timestamp)}: no location for {formatDuration(gap.minutes)} (phone off, no network or app closed)
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {routeCheck.verdict === 'ok' && <div className="small text-muted mt-1">Every point follows the previous one at a realistic speed, with no long gaps.</div>}
+                  </div>
+                )}
+
+                {routePoints.length > 1 && (
+                  <div className="lt-replay">
+                    <button type="button" className="lt-btn active" onClick={() => setReplay((prev) => ({ ...prev, index: prev.index >= routePoints.length - 1 ? 0 : Math.max(prev.index, 0), playing: !prev.playing }))}>
+                      {replay.playing ? 'Pause' : replay.index >= 0 ? 'Play' : 'Play route'}
+                    </button>
+                    <input
+                      type="range"
+                      min="0"
+                      max={routePoints.length - 1}
+                      value={Math.max(replay.index, 0)}
+                      onChange={(e) => setReplay((prev) => ({ ...prev, index: Number(e.target.value), playing: false }))}
+                      aria-label="Route replay position"
+                    />
+                    <select className="lt-select" value={replay.speed} onChange={(e) => setReplay((prev) => ({ ...prev, speed: Number(e.target.value) }))} aria-label="Replay speed">
+                      <option value={1}>1x</option>
+                      <option value={3}>3x</option>
+                      <option value={10}>10x</option>
+                    </select>
+                    <span className="small fw-bold" style={{ minWidth: 120, textAlign: 'right' }}>
+                      {replayRow ? `${formatClock(replayRow.timestamp)}${isNum(replayRow.speed) && replayRow.speed >= 1 ? ` · ${Math.round(replayRow.speed * 3.6)} km/h` : ''}` : 'Replay the day'}
+                    </span>
+                  </div>
+                )}
+
                 <div className="d-flex justify-content-between align-items-center">
                   <strong style={{ fontSize: '.92rem' }}>Route timeline</strong>
                   <span className="small text-muted">{route ? `${route.totalPoints} location points` : ''}</span>
@@ -969,7 +1206,12 @@ const EmployeeTracking = () => {
                             <span className="lt-tl-icon" style={{ background: atOffice ? '#16a34a' : '#0a1f8f' }}>{number}</span>
                             <div className="lt-tl-body">
                               <strong>{item.minutes >= 1 ? `Stayed ${formatDuration(item.minutes)}` : 'Located'}{atOffice ? ' at office' : ''}</strong>
-                              <small>{item.address || `${item.latitude.toFixed(5)}, ${item.longitude.toFixed(5)}`}</small>
+                              <small>
+                                {item.address || addressOf(item.latitude, item.longitude) || `${item.latitude.toFixed(5)}, ${item.longitude.toFixed(5)}`}
+                                {!item.address && !addressOf(item.latitude, item.longitude) && (
+                                  <>{' · '}<button type="button" className="lt-addr-btn" onClick={(e) => { e.stopPropagation(); lookupAddress(item.latitude, item.longitude); }}>Find address</button></>
+                                )}
+                              </small>
                             </div>
                             <span className="lt-tl-time">{formatClock(item.start)}{item.minutes >= 1 ? ` – ${formatClock(item.end)}` : ''}</span>
                           </div>
@@ -999,10 +1241,10 @@ const EmployeeTracking = () => {
 
         {/* ---------- right column: radar + roster ---------- */}
         <div className="d-grid gap-3">
-          <div className="lt-card lt-radar-card">
+          <div className={`lt-card lt-radar-card theme-${theme}`}>
             <div className="lt-card-head">
-              <strong style={{ color: '#fff' }}>Radar</strong>
-              <span style={{ fontSize: '.72rem', color: '#86efac', fontFamily: 'ui-monospace, Menlo, Consolas, monospace' }}>
+              <strong className="lt-radar-title">Radar</strong>
+              <span className="lt-radar-sub">
                 {officePoint ? `${office?.label || 'Office'} · ${officePoint[0].toFixed(4)}, ${officePoint[1].toFixed(4)}` : 'Office location not set'}
               </span>
             </div>
@@ -1014,6 +1256,7 @@ const EmployeeTracking = () => {
                 selectedId={selectedId}
                 onSelect={selectEmployee}
                 centerLabel={office?.label || 'Office'}
+                theme={theme}
               />
             </div>
             <div className="lt-radar-controls">
@@ -1035,7 +1278,7 @@ const EmployeeTracking = () => {
                   value={customKm}
                   onChange={(e) => { setCustomKm(e.target.value); setRadarRange('custom'); }}
                 />
-                <span style={{ fontSize: '.7rem', color: '#4d7c63' }}>km, up to {MAX_RADAR_KM.toLocaleString('en-IN')}</span>
+                <span className="lt-radar-dim" style={{ fontSize: '.7rem' }}>km, up to {MAX_RADAR_KM.toLocaleString('en-IN')}</span>
                 <span style={{ flex: 1 }} />
                 <label>Scale</label>
                 <button type="button" className={radarScale === 'log' ? 'active' : ''} onClick={() => setRadarScale('log')}>LOG</button>
@@ -1043,13 +1286,13 @@ const EmployeeTracking = () => {
               </div>
             </div>
             <div className="lt-contacts">
-              {contacts.length === 0 && <div className="p-3 small" style={{ color: '#4d7c63' }}>No contacts on the radar for this filter.</div>}
+              {contacts.length === 0 && <div className="p-3 small lt-radar-dim">No contacts on the radar for this filter.</div>}
               {contacts.slice(0, 60).map((blip) => (
                 <button key={blip.id} type="button" className={`lt-contact ${blip.id === selectedId ? 'selected' : ''}`} onClick={() => selectEmployee(blip.id)}>
                   <i style={{ background: blip.color, boxShadow: blip.live ? `0 0 8px ${blip.color}` : 'none' }} />
                   <span>{blip.name}</span>
                   <span>{String(Math.round(blip.bearing)).padStart(3, '0')}° {compassOf(blip.bearing)}</span>
-                  <span style={{ color: blip.distance > effectiveRange ? '#fca5a5' : '#86efac' }}>{formatDistance(blip.distance)}</span>
+                  <span className={`lt-dist ${blip.distance > effectiveRange ? 'far' : ''}`}>{formatDistance(blip.distance)}</span>
                 </button>
               ))}
             </div>

@@ -21,6 +21,8 @@ const DashboardLiveOps = ({ onNavigate }) => {
   const [queue, setQueue] = useState({ data: [], summary: {} });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
+  // Same radar theme as the Live Tracking page.
+  const [theme] = useState(() => { try { return localStorage.getItem('lt-theme') === 'dark' ? 'dark' : 'light'; } catch (e) { return 'light'; } });
 
   const load = useCallback(async () => {
     const [trackingRes, queueRes] = await Promise.allSettled([
@@ -131,6 +133,8 @@ const DashboardLiveOps = ({ onNavigate }) => {
         .dlo-head strong { font-size: .95rem; }
         .dlo-link { border: none; background: none; color: #0a1f8f; font-weight: 800; font-size: .8rem; cursor: pointer; padding: 0; }
         .dlo-card.dark .dlo-link { color: #86efac; }
+        .dlo-card.radar-light { background: linear-gradient(180deg, #ffffff, #f3f6ff); }
+        .dlo-card.radar-light .dlo-live { color: #15803d; }
         .dlo-live { display: inline-flex; align-items: center; gap: 6px; font-size: .72rem; font-weight: 700; color: #86efac; }
         .dlo-live i { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 8px #22c55e; }
         .dlo-list { display: grid; }
@@ -151,7 +155,7 @@ const DashboardLiveOps = ({ onNavigate }) => {
         .dlo-empty { padding: 26px 14px; text-align: center; color: #64748b; font-size: .86rem; }
         .dlo-foot { margin-top: auto; padding: 10px 14px; font-size: .78rem; color: #64748b; border-top: 1px solid #f0f2f7; }
         .dlo-card.dark .dlo-foot { border-top-color: rgba(255,255,255,.07); color: #4d7c63; font-family: ui-monospace, Menlo, Consolas, monospace; }
-        @media (max-width: 1280px) { .dlo-grid { grid-template-columns: 1fr 1fr; } .dlo-grid > .dlo-card.dark { grid-column: 1 / -1; } .dlo-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        @media (max-width: 1280px) { .dlo-grid { grid-template-columns: 1fr 1fr; } .dlo-grid > .dlo-card:first-child { grid-column: 1 / -1; } .dlo-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
         @media (max-width: 760px) { .dlo-grid { grid-template-columns: 1fr; } .dlo-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
       `}</style>
 
@@ -165,13 +169,13 @@ const DashboardLiveOps = ({ onNavigate }) => {
       </div>
 
       <div className="dlo-grid">
-        <div className="dlo-card dark">
+        <div className={`dlo-card ${theme === 'dark' ? 'dark' : 'radar-light'}`}>
           <div className="dlo-head">
-            <strong style={{ color: '#fff' }}>Live radar</strong>
+            <strong style={{ color: theme === 'dark' ? '#fff' : '#0a1f8f' }}>Live radar</strong>
             <span className="dlo-live"><i />{stats.live} live GPS</span>
           </div>
           <div style={{ padding: '4px 8px 0', maxWidth: 340, margin: '0 auto', width: '100%' }}>
-            <TrackingRadar blips={stats.blips} range={range} scale="log" compact centerLabel={office?.label || 'Office'} onSelect={() => onNavigate && onNavigate('tracking')} />
+            <TrackingRadar blips={stats.blips} range={range} scale="log" compact theme={theme} centerLabel={office?.label || 'Office'} onSelect={() => onNavigate && onNavigate('tracking')} />
           </div>
           <div className="dlo-foot d-flex justify-content-between align-items-center">
             <span>{stats.blips.length} on radar · range {formatDistance(range)}</span>

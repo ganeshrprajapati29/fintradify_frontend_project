@@ -68,6 +68,7 @@ const AdminSettings = () => {
       allowEarlyCheckOut: data.allowEarlyCheckOut ?? true,
       earlyCheckOutGracePeriod: data.earlyCheckOutGracePeriod || 15,
       allowWorkFromHome: data.allowWorkFromHome ?? true,
+      extraShiftPayRate: data.extraShiftPayRate ?? 1,
     });
 
     setLeaveSettings({
@@ -660,6 +661,25 @@ const AdminSettings = () => {
                       value={attendanceSettings.earlyCheckOutGracePeriod}
                       onChange={(e) => setAttendanceSettings({...attendanceSettings, earlyCheckOutGracePeriod: parseInt(e.target.value)})}
                     />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Extra shift pay rate (x hourly rate)</Form.Label>
+                    <Form.Select
+                      value={String(attendanceSettings.extraShiftPayRate ?? 1)}
+                      onChange={(e) => setAttendanceSettings({...attendanceSettings, extraShiftPayRate: Number(e.target.value)})}
+                    >
+                      <option value="0">Not paid</option>
+                      <option value="1">1x (same as normal hours)</option>
+                      <option value="1.25">1.25x</option>
+                      <option value="1.5">1.5x</option>
+                      <option value="2">2x (double)</option>
+                    </Form.Select>
+                    <Form.Text muted>
+                      Pay for extra-shift hours (a second session outside the day's first shift, or work on a weekly off / holiday).
+                      Hourly rate = per-day salary / shift hours. Used in salary slips and the attendance report.
+                    </Form.Text>
                   </Form.Group>
                 </Col>
               </Row>

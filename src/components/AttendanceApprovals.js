@@ -295,6 +295,9 @@ const AttendanceApprovals = () => {
                     <td style={{ whiteSpace: 'nowrap' }}>
                       <strong>{formatTime(record.punchIn)}</strong>
                       {record.isLate && <div><span className="aa-tag late">Late {record.lateMinutes ? `${record.lateMinutes}m` : ''}</span></div>}
+                      {record.extraShift && <div><span className="aa-tag auto">Extra shift</span></div>}
+                      {(record.session || 1) > 1 && !record.extraShift && <div><span className="aa-tag office">Session {record.session}</span></div>}
+                      {(record.source === 'manual' || record.source === 'bulk') && <div><span className="aa-tag wfh">Entered by admin</span></div>}
                     </td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       {record.punchOut ? <strong>{formatTime(record.punchOut)}</strong> : <span className="aa-tag open">Still working</span>}
