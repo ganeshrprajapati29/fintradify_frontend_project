@@ -35,7 +35,7 @@ const emptyForm = { enabled: true, label: '', latitude: '', longitude: '', radiu
 
 /**
  * Admin: assign an employee-specific punch area (lat/lng + radius).
- * Employees without an enabled area use the office radius.
+ * Everyone can punch inside the office radius; an enabled area is an extra allowed place.
  */
 const EmployeeLocationManager = ({ office }) => {
   const [employees, setEmployees] = useState([]);
@@ -170,8 +170,8 @@ const EmployeeLocationManager = ({ office }) => {
           <p className="radius-eyebrow">Employee-specific punch areas</p>
           <h4 className="radius-title" style={{ fontSize: '1.2rem' }}>Where can each employee punch?</h4>
           <p className="text-muted small mb-0">
-            Assign a location and radius per employee (site, warehouse, client office). Employees without an
-            assigned area use the office radius above. {assignedCount} of {employees.length} employees have their own area.
+            Everyone can punch inside the office area above. Give an employee their own location and radius (site, warehouse,
+            client office) and they can punch there as well as at the office. {assignedCount} of {employees.length} employees have their own area.
           </p>
         </div>
         <Form.Control
@@ -243,7 +243,7 @@ const EmployeeLocationManager = ({ office }) => {
             type="switch"
             id="employee-area-enabled"
             className="mb-3"
-            label="Use a custom punch area for this employee (off = office radius)"
+            label="Also allow punching at this place (the office area always works)"
             checked={form.enabled}
             onChange={(event) => setForm({ ...form, enabled: event.target.checked })}
           />

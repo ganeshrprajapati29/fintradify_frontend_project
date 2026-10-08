@@ -210,7 +210,7 @@ const ADMIN_CHAPTERS = [
     summary: 'Where employees are allowed to punch in. There is one office area for everyone, and you can give any employee their own area (for example a client site).',
     steps: [
       'Office: click on the map or enter latitude and longitude, set the radius in metres, and save.',
-      'Per employee: in the employee list below the map, click Edit on the employee, switch on "Use a custom punch area for this employee", click the map to place the point, set the radius and save. That employee can then punch only inside their own area.',
+      'Per employee: in the employee list below the map, click Edit on the employee, switch on "Also allow punching at this place", click the map to place the point, set the radius and save. That employee can then punch inside their own area and also inside the office area.',
       'Approved Work From Home days skip the location check.',
     ],
     tips: ['The office point is also the centre of the Live Tracking radar.'],
