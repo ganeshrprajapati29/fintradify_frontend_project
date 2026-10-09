@@ -50,13 +50,17 @@ const EmployeeLocationManager = ({ office }) => {
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
   const [shifts, setShifts] = useState([]);
+  const [sites, setSites] = useState([]);
+  const [sitesFor, setSitesFor] = useState(null); // employee whose sites are being edited
+  const [pickedSites, setPickedSites] = useState([]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [employeesRes, trackingRes, shiftsRes] = await Promise.allSettled([api.get('/employees'), api.get('/tracking'), api.get('/shifts')]);
+      const [employeesRes, trackingRes, shiftsRes, sitesRes] = await Promise.allSettled([api.get('/employees'), api.get('/tracking'), api.get('/shifts'), api.get('/work-locations')]);
       if (employeesRes.status !== 'fulfilled') throw employeesRes.reason;
       if (shiftsRes.status === 'fulfilled') setShifts(asList(shiftsRes.value.data));
+      if (sitesRes.status === 'fulfilled') setSites(asList(sitesRes.value.data));
       setEmployees(asList(employeesRes.value.data).filter((emp) => emp.role !== 'admin' && emp.status !== 'terminated'));
       if (trackingRes.status === 'fulfilled') {
         const seen = {};
@@ -84,6 +88,21 @@ const EmployeeLocationManager = ({ office }) => {
   }, [employees, query]);
 
   const assignedCount = employees.filter((emp) => emp.attendanceLocation?.enabled).length;
+
+  const sitesOf = (emp) => (emp.workLocations || []).map((id) => sites.find((s) => s._id === String(id))).filter((s) => s && s.isActive !== false);
+
+  // Work locations and field mode of one employee.
+  const saveSitesAndMode = async (emp, body) => {
+    try {
+      const res = await api.put(`/work-locations/employee/${emp._id}`, body);
+      const data = res.data?.data || {};
+      setEmployees((prev) => prev.map((e) => (e._id === emp._id ? { ...e, workLocations: data.workLocations ?? e.workLocations, fieldAllowed: data.fieldAllowed ?? e.fieldAllowed } : e)));
+      setSuccess(res.data?.message || 'Saved');
+      setError('');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Could not save');
+    }
+  };
 
   // Shift areas that also apply to an employee (their shifts, or the default shift).
   const shiftAreasOf = (emp) => {
@@ -177,7 +196,7 @@ const EmployeeLocationManager = ({ office }) => {
     <Card className="radius-card mt-3">
       <div className="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
         <div>
-          <p className="radius-eyebrow">Step 3 · Employee areas</p>
+          <p className="radius-eyebrow">Step 4 · Employees: sites, field mode and own area</p>
           <h4 className="radius-title" style={{ fontSize: '1.2rem' }}>Where can each employee punch?</h4>
           <p className="text-muted small mb-0">
             Everyone can punch inside the office area above. Give an employee their own location and radius (site, warehouse,
@@ -206,8 +225,8 @@ const EmployeeLocationManager = ({ office }) => {
               <tr>
                 <th>Employee</th>
                 <th>Can punch at</th>
+                <th>Field mode</th>
                 <th>Own area radius</th>
-                <th>Own area coordinates</th>
                 <th className="text-end">Action</th>
               </tr>
             </thead>
@@ -223,20 +242,33 @@ const EmployeeLocationManager = ({ office }) => {
                     </td>
                     <td>
                       <div className="d-flex flex-wrap gap-1">
+                        {emp.fieldAllowed && <Badge bg="" style={{ background: '#dcfce7', color: '#15803d' }}>Anywhere in field mode</Badge>}
                         <Badge bg="" style={{ background: '#eef1fc', color: '#0a1f8f' }}>Office · {office?.officeRadiusMeters ?? 100} m</Badge>
+                        {sitesOf(emp).map((s) => (
+                          <Badge key={s._id} bg="" style={{ background: `${s.color || '#0369a1'}1a`, color: s.color || '#0369a1' }}>{s.name} · {s.radiusMeters} m</Badge>
+                        ))}
                         {shiftAreasOf(emp).map((s) => (
                           <Badge key={s._id} bg="" style={{ background: '#e0f2fe', color: '#0369a1' }}>{s.location.label || `${s.name} area`} · {Math.round(s.location.radiusMeters)} m</Badge>
                         ))}
                         {active && <Badge bg="" style={{ background: '#ede9fe', color: '#6d28d9' }}>{own.label || 'Own area'} · {Math.round(own.radiusMeters)} m</Badge>}
                       </div>
                     </td>
-                    <td>{active ? `${Math.round(own.radiusMeters)} m` : <span className="text-muted small">Not set</span>}</td>
-                    <td className="small text-muted">
-                      {active ? `${Number(own.latitude).toFixed(5)}, ${Number(own.longitude).toFixed(5)}` : '—'}
+                    <td>
+                      <Form.Check
+                        type="switch"
+                        id={`field-${emp._id}`}
+                        checked={Boolean(emp.fieldAllowed)}
+                        label={emp.fieldAllowed ? 'Allowed' : 'Off'}
+                        onChange={(event) => saveSitesAndMode(emp, { fieldAllowed: event.target.checked })}
+                      />
                     </td>
+                    <td>{active ? `${Math.round(own.radiusMeters)} m` : <span className="text-muted small">Not set</span>}</td>
                     <td className="text-end">
+                      <Button size="sm" variant="outline-secondary" className="me-1" onClick={() => { setSitesFor(emp); setPickedSites((emp.workLocations || []).map(String)); }} disabled={!sites.length}>
+                        Sites
+                      </Button>
                       <Button size="sm" variant="outline-primary" onClick={() => openEditor(emp)}>
-                        {active ? 'Edit area' : 'Set area'}
+                        {active ? 'Edit own area' : 'Own area'}
                       </Button>
                     </td>
                   </tr>
@@ -246,6 +278,30 @@ const EmployeeLocationManager = ({ office }) => {
           </Table>
         </div>
       )}
+
+      <Modal show={Boolean(sitesFor)} onHide={() => setSitesFor(null)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title style={{ fontSize: '1.05rem' }}>Work locations · {sitesFor?.name}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="small text-muted">Tick every place this employee works at. They can punch inside any of them, and always in the office area.</p>
+          {sites.filter((s) => s.isActive !== false).map((s) => (
+            <Form.Check
+              key={s._id}
+              type="checkbox"
+              id={`site-${s._id}`}
+              className="py-1"
+              checked={pickedSites.includes(s._id)}
+              onChange={(ev) => setPickedSites(ev.target.checked ? [...pickedSites, s._id] : pickedSites.filter((id) => id !== s._id))}
+              label={<span><span className="fw-semibold" style={{ color: s.color }}>{s.name}</span> <span className="small text-muted">{s.radiusMeters} m{s.address ? ` · ${s.address}` : ''}</span></span>}
+            />
+          ))}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="light" onClick={() => setSitesFor(null)}>Cancel</Button>
+          <Button onClick={async () => { const emp = sitesFor; setSitesFor(null); await saveSitesAndMode(emp, { locationIds: pickedSites }); }}>Save</Button>
+        </Modal.Footer>
+      </Modal>
 
       <Modal show={Boolean(editing)} onHide={() => !saving && setEditing(null)} size="lg" centered>
         <Modal.Header closeButton>

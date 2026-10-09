@@ -760,8 +760,8 @@ const AttendanceTable = ({ isEmployee }) => {
                     <td>{getHoursWorked(attendance)}</td>
                     <td>{renderStatus(attendance.status)}</td>
                     <td>
-                      <Badge bg={attendance.mode === 'wfh' ? 'info' : 'secondary'}>
-                        {attendance.mode === 'wfh' ? 'WFH' : 'Office'}
+                      <Badge bg={attendance.mode === 'wfh' ? 'info' : attendance.mode === 'field' ? 'success' : 'secondary'}>
+                        {attendance.mode === 'wfh' ? 'WFH' : attendance.mode === 'field' ? 'Field' : 'Office'}
                       </Badge>
                     </td>
                     <td className="attendance-location" title={attendance.locationAddress || ''}>{attendance.locationAddress || '-'}</td>
@@ -790,8 +790,8 @@ const AttendanceTable = ({ isEmployee }) => {
                     {!isEmployee && <div className="text-muted small">{attendance.employee?.name || 'N/A'} ({attendance.employee?.employeeId || 'N/A'})</div>}
                   </div>
                   <div className="d-flex gap-2 align-items-center">
-                    <Badge bg={attendance.mode === 'wfh' ? 'info' : 'secondary'}>
-                      {attendance.mode === 'wfh' ? 'WFH' : 'Office'}
+                    <Badge bg={attendance.mode === 'wfh' ? 'info' : attendance.mode === 'field' ? 'success' : 'secondary'}>
+                      {attendance.mode === 'wfh' ? 'WFH' : attendance.mode === 'field' ? 'Field' : 'Office'}
                     </Badge>
                     {renderStatus(attendance.status)}
                   </div>

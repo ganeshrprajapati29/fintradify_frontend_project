@@ -388,7 +388,7 @@ const AttendanceList = ({ status }) => {
                           <td>{hoursWorked}</td>
                           <td>
                             <Badge bg={att.mode === 'wfh' ? 'info' : 'secondary'}>
-                              {att.mode === 'wfh' ? 'WFH' : 'Office'}
+                              {att.mode === 'wfh' ? 'WFH' : att.mode === 'field' ? 'Field' : 'Office'}
                             </Badge>
                           </td>
                           <td>

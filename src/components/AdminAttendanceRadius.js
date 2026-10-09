@@ -3,6 +3,7 @@ import { Alert, Button, Card, Col, Form, Row } from 'react-bootstrap';
 import api from '../utils/axios';
 import EmployeeLocationManager from './EmployeeLocationManager';
 import ShiftAreaManager from './ShiftAreaManager';
+import WorkLocationManager from './WorkLocationManager';
 
 const DEFAULTS = {
   officeLatitude: 28.595339,
@@ -17,6 +18,7 @@ const AdminAttendanceRadius = () => {
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [sitesVersion, setSitesVersion] = useState(0); // reloads the employee list after site changes
 
   const fetchSettings = async () => {
     setLoading(true);
@@ -159,9 +161,10 @@ const AdminAttendanceRadius = () => {
         <p className="radius-eyebrow">Punch areas</p>
         <h2 className="radius-title">Attendance Radius</h2>
         <p className="radius-subtitle">
-          There are three separate kinds of punch area: 1) the office area, for everyone; 2) a shift area, for everyone in that shift;
-          3) an employee's own area. An employee can punch in or out inside any of their areas, as many times a day as they work.
-          Each area is saved on its own and saving one never changes another. Approved Work From Home days skip the check.
+          Punch areas, each saved on its own (saving one never changes another): 1) the office area, for everyone; 2) work locations
+          such as branches and sites, for the employees you choose; 3) an optional area per shift; 4) per employee: field mode
+          (punch from anywhere, tracked live) and an own area. An employee can punch inside any of their areas, as many times a day
+          as they work. Approved Work From Home days skip the check.
         </p>
       </section>
 
@@ -228,8 +231,9 @@ const AdminAttendanceRadius = () => {
         )}
       </Card>
 
+      {!loading && <WorkLocationManager office={form} onChanged={() => setSitesVersion((v) => v + 1)} />}
       {!loading && <ShiftAreaManager office={form} />}
-      {!loading && <EmployeeLocationManager office={form} />}
+      {!loading && <EmployeeLocationManager key={sitesVersion} office={form} />}
     </div>
   );
 };

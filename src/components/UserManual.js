@@ -211,7 +211,10 @@ const ADMIN_CHAPTERS = [
     steps: [
       'Office: click on the map or enter latitude and longitude, set the radius in metres, and save.',
       'Per employee: in the employee list below the map, click Edit on the employee, switch on "Also allow punching at this place", click the map to place the point, set the radius and save. That employee can then punch inside their own area and also inside the office area.',
-      'Shift areas (Step 2): click Set area on a shift and place its point on the map. Everyone in that shift can then punch there too, for example the Ghaziabad or Ahmedabad office.',
+      'Work locations (Step 2): click "Add location" for every branch, warehouse or client site, place it on the map and set the radius. Then click "Employees" to choose who works there. Those employees can punch inside it.',
+      'Shift areas (Step 3, optional): click Set area on a shift and place its point on the map. Everyone in that shift can then punch there too.',
+      'Employees (Step 4): "Sites" chooses the work locations of an employee, the "Field mode" switch lets drivers and field staff punch from anywhere (their live location is tracked while on duty), and "Own area" adds a personal place.',
+      'Fake GPS (mock location) apps are detected by the app and such punches are refused, in every mode.',
       'An employee can punch inside any of their areas: the office area, the area of each of their shifts, and their own area. Saving one area never changes the others.',
       'Approved Work From Home days skip the location check.',
     ],
@@ -424,6 +427,9 @@ const EMPLOYEE_CHAPTERS = [
       'Your shift and timing are shown on the home screen. Punching in after the start time plus grace minutes is marked late.',
       'On an approved Work From Home day you can punch in from anywhere.',
       'After your shift you can work another session: tap "Start extra shift". It is recorded separately, is not marked late, and the extra hours are paid as per company policy.',
+      'Working as: if you have more than one shift, pick the shift you are working on the home screen before punching in. Field staff allowed by HR also see "Field", which lets you punch from anywhere while your live location is shared.',
+      'The app changes its look with your shift: a night look for night shifts, sunrise colours in the morning, sunset colours in the evening and green for field work.',
+      'The "Today\'s sessions" card on the home screen lists every punch in and out of the day with its hours.',
     ],
     tips: [
       'If punch-in fails with "outside the allowed area", move closer to the office or contact HR.',

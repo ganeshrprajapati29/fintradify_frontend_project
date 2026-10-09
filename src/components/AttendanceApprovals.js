@@ -306,7 +306,7 @@ const AttendanceApprovals = () => {
                     <td style={{ whiteSpace: 'nowrap' }}>{formatHours(record.hoursWorked)}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>{record.shift?.name || '—'}</td>
                     <td className="aa-loc">
-                      <span className={`aa-tag ${record.mode === 'wfh' ? 'wfh' : 'office'}`}>{record.mode === 'wfh' ? 'Work from home' : 'Office'}</span>
+                      <span className={`aa-tag ${record.mode === 'wfh' ? 'wfh' : 'office'}`}>{record.mode === 'wfh' ? 'Work from home' : record.mode === 'field' ? 'Field' : 'Office'}</span>
                       <div className="text-muted mt-1">{record.locationAddress || 'Address not available'}</div>
                       <div className="d-flex gap-2 mt-1">
                         {inPoint && <a href={mapsUrl(inPoint)} target="_blank" rel="noopener noreferrer">In on map</a>}

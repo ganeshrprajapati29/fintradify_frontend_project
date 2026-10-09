@@ -31,10 +31,11 @@ const STATUS = {
   offduty: { label: 'Off duty', color: '#94a3b8', soft: '#f1f5f9', rank: 5 },
 };
 
+const MAX_ZOOM = 21;
 const TILES = {
-  light: { label: 'Streets', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', attribution: '&copy; OpenStreetMap contributors' },
-  dark: { label: 'Dark', url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', attribution: '&copy; OpenStreetMap contributors &copy; CARTO' },
-  satellite: { label: 'Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attribution: 'Tiles &copy; Esri' },
+  light: { label: 'Streets', url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', attribution: '&copy; OpenStreetMap contributors', native: 19 },
+  dark: { label: 'Dark', url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', attribution: '&copy; OpenStreetMap contributors &copy; CARTO', native: 20 },
+  satellite: { label: 'Satellite', url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attribution: 'Tiles &copy; Esri', native: 19 },
 };
 
 const positionOf = (employee) => {
@@ -266,8 +267,8 @@ const FitBounds = ({ points, fitKey }) => {
   useEffect(() => {
     if (last.current === fitKey || !points.length) return;
     last.current = fitKey;
-    if (points.length === 1) map.setView(points[0], 15);
-    else map.fitBounds(points, { padding: [48, 48], maxZoom: 16 });
+    if (points.length === 1) map.setView(points[0], 17);
+    else map.fitBounds(points, { padding: [48, 48], maxZoom: 18 });
   }, [points, fitKey, map]);
   return null;
 };
@@ -319,7 +320,9 @@ const checkRoute = (route) => {
 const FlyTo = ({ target }) => {
   const map = useMap();
   useEffect(() => {
-    if (target) map.flyTo(target.point, Math.max(map.getZoom(), target.zoom || 16), { duration: 0.8 });
+    if (!target) return;
+    if (target.bounds) map.flyToBounds(target.bounds, { padding: [40, 40], maxZoom: 19, duration: 0.8 });
+    else map.flyTo(target.point, Math.max(map.getZoom(), target.zoom || 17), { duration: 0.8 });
   }, [target, map]);
   return null;
 };
@@ -689,7 +692,7 @@ const EmployeeTracking = () => {
   const addressOf = (lat, lng) => addresses[`${Number(lat).toFixed(5)},${Number(lng).toFixed(5)}`];
 
   const focusOn = (lat, lng) => {
-    if (isNum(lat) && isNum(lng)) setFlyTarget({ point: [Number(lat), Number(lng)], zoom: 17, at: Date.now() });
+    if (isNum(lat) && isNum(lng)) setFlyTarget({ point: [Number(lat), Number(lng)], zoom: 19, at: Date.now() });
   };
 
   const fitKey = `${filter}|${query}|${located.length > 0}|${selectedId || ''}|${routePoints.length ? 'r' : ''}|${routeDate}`;
@@ -925,8 +928,8 @@ const EmployeeTracking = () => {
                 {loading ? (
                   <div className="lt-map-empty">Loading live positions…</div>
                 ) : (
-                  <MapContainer center={officePoint || [28.5512, 77.132]} zoom={12} scrollWheelZoom>
-                    <TileLayer key={mapStyle} url={tiles.url} attribution={tiles.attribution} />
+                  <MapContainer center={officePoint || [28.5512, 77.132]} zoom={12} maxZoom={MAX_ZOOM} zoomSnap={0.5} wheelPxPerZoomLevel={90} scrollWheelZoom>
+                    <TileLayer key={mapStyle} url={tiles.url} attribution={tiles.attribution} maxZoom={MAX_ZOOM} maxNativeZoom={tiles.native} />
                     <FitBounds points={fitPoints} fitKey={fitKey} />
                     <FlyTo target={flyTarget} />
 
@@ -1099,6 +1102,12 @@ const EmployeeTracking = () => {
                 <div className="d-flex flex-wrap gap-2 align-items-center">
                   <input type="date" className="lt-input" style={{ width: 'auto' }} value={routeDate} max={todayKey()} onChange={(e) => changeRouteDate(e.target.value)} />
                   <button type="button" className={`lt-btn ${follow ? 'active' : ''}`} onClick={toggleFollow}>{follow ? 'Following live' : 'Follow live'}</button>
+                  {routePoints.length > 1 && (
+                    <button type="button" className="lt-btn" onClick={() => setFlyTarget({ bounds: routePoints, at: Date.now() })}>Zoom to route</button>
+                  )}
+                  {selected.info.position && (
+                    <button type="button" className="lt-btn" onClick={() => setFlyTarget({ point: selected.info.position, zoom: 19, at: Date.now() })}>Zoom to live position</button>
+                  )}
                   {selected.info.position && <a className="lt-btn" href={googleMapsUrl(selected.info.position[0], selected.info.position[1])} target="_blank" rel="noopener noreferrer">Google Maps</a>}
                   <button type="button" className="lt-btn" onClick={clearSelection}>Close</button>
                 </div>

@@ -115,7 +115,7 @@ const ShiftAreaManager = ({ office }) => {
   return (
     <Card className="border-0 shadow-sm mt-4" style={{ borderRadius: 16 }}>
       <Card.Body className="p-3 p-md-4">
-        <p className="radius-eyebrow">Step 2 · Shift areas</p>
+        <p className="radius-eyebrow">Step 3 · Shift areas (optional)</p>
         <h4 className="radius-title" style={{ fontSize: '1.2rem' }}>Where can each shift punch?</h4>
         <p className="text-muted small">
           Give a shift its own place (for example the Ghaziabad or Ahmedabad office). Everyone in that shift can then punch

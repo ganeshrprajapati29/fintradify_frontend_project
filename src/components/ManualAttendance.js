@@ -402,6 +402,7 @@ const ManualAttendance = () => {
               <select id="ma-mode" className="ma-input" value={form.mode} onChange={(e) => setField('mode', e.target.value)}>
                 <option value="office">Office</option>
                 <option value="wfh">Work from home</option>
+                <option value="field">Field</option>
               </select>
             </div>
             <div className="ma-field">
@@ -482,6 +483,7 @@ const ManualAttendance = () => {
                   <select id="mb-mode" className="ma-input" value={bulk.mode} onChange={(e) => setBulk({ ...bulk, mode: e.target.value })}>
                     <option value="office">Office</option>
                     <option value="wfh">Work from home</option>
+                <option value="field">Field</option>
                   </select>
                 </div>
               </>
@@ -640,6 +642,7 @@ const ManualAttendance = () => {
                 <select id="me-mode" className="ma-input" value={editForm.mode} onChange={(e) => setEditForm({ ...editForm, mode: e.target.value })}>
                   <option value="office">Office</option>
                   <option value="wfh">Work from home</option>
+                <option value="field">Field</option>
                 </select>
               </div>
               <div className="ma-field">
