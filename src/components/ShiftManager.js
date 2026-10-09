@@ -59,6 +59,7 @@ const ShiftManager = () => {
   const [chosen, setChosen] = useState([]);
   const [recalcOpen, setRecalcOpen] = useState(false);
   const [recalcDate, setRecalcDate] = useState(monthStartKey());
+  const [peopleOf, setPeopleOf] = useState(null); // shift whose employees are listed
 
   const load = async () => {
     setLoading(true);
@@ -80,6 +81,18 @@ const ShiftManager = () => {
 
   const defaultShift = shifts.find((shift) => shift.isDefault);
   // All shifts of an employee; the default shift when none is assigned.
+  // Assigned shifts that are still active (an employee whose shifts are all inactive works the default shift).
+  const activeIdsOf = (emp) => idsOf(emp).filter((id) => shifts.some((s) => s._id === id && s.isActive !== false));
+
+  // Employees in a shift: assigned to it, plus (for the default shift) everyone without an active shift.
+  const membersOf = (shift) => {
+    const assigned = employees.filter((emp) => idsOf(emp).includes(shift._id));
+    const viaDefault = shift.isDefault ? employees.filter((emp) => activeIdsOf(emp).length === 0) : [];
+    return { assigned, viaDefault, all: [...assigned, ...viaDefault] };
+  };
+  const unassignedCount = employees.filter((emp) => activeIdsOf(emp).length === 0).length;
+  const multiCount = employees.filter((emp) => idsOf(emp).length > 1).length;
+
   const shiftsOf = (emp) => {
     const own = idsOf(emp).map((id) => shifts.find((shift) => shift._id === id)).filter(Boolean);
     return own.length ? own : (defaultShift ? [defaultShift] : []);
@@ -217,6 +230,22 @@ const ShiftManager = () => {
         </div>
       </Card>
 
+      {!loading && employees.length > 0 && (
+        <Card className="p-3 border-0 shadow-sm" style={{ borderRadius: 16 }}>
+          <div className="d-flex flex-wrap gap-4 small">
+            <span><strong style={{ fontSize: '1.1rem' }}>{employees.length}</strong> employees</span>
+            <span><strong style={{ fontSize: '1.1rem' }}>{employees.length - unassignedCount}</strong> with a shift assigned</span>
+            <span><strong style={{ fontSize: '1.1rem' }}>{unassignedCount}</strong> on the default shift{defaultShift ? ` (${defaultShift.name})` : ''}</span>
+            <span><strong style={{ fontSize: '1.1rem' }}>{multiCount}</strong> work more than one shift</span>
+          </div>
+          {multiCount > 0 && (
+            <div className="small text-muted mt-1">
+              Employees with several shifts are counted in each of their shifts, so the shift totals can add up to more than {employees.length}.
+            </div>
+          )}
+        </Card>
+      )}
+
       {error && <Alert variant="danger" onClose={() => setError('')} dismissible>{error}</Alert>}
       {success && <Alert variant="success" onClose={() => setSuccess('')} dismissible>{success}</Alert>}
 
@@ -242,8 +271,18 @@ const ShiftManager = () => {
                       </div>
                     </div>
                     <div className="text-end">
-                      <div className="fw-bold" style={{ fontSize: '1.4rem', lineHeight: 1 }}>{shift.employeeCount}</div>
-                      <div className="small text-muted">employees</div>
+                      {(() => {
+                        const members = membersOf(shift);
+                        return (
+                          <button type="button" onClick={() => setPeopleOf(shift)} title="See who is in this shift" style={{ border: 'none', background: 'none', padding: 0, textAlign: 'right' }}>
+                            <div className="fw-bold" style={{ fontSize: '1.4rem', lineHeight: 1, color: shift.color }}>{members.all.length}</div>
+                            <div className="small text-muted">{members.all.length === 1 ? 'employee' : 'employees'}</div>
+                            {shift.isDefault && members.viaDefault.length > 0 && (
+                              <div className="small text-muted" style={{ fontSize: '.72rem' }}>{members.assigned.length} assigned + {members.viaDefault.length} default</div>
+                            )}
+                          </button>
+                        );
+                      })()}
                     </div>
                   </div>
                   <div className="my-3">
@@ -389,6 +428,34 @@ const ShiftManager = () => {
           <Button variant="light" onClick={() => setRecalcOpen(false)}>Cancel</Button>
           <Button onClick={runRecalculate} disabled={!recalcDate}>Update</Button>
         </Modal.Footer>
+      </Modal>
+
+      {/* Employees of one shift */}
+      <Modal show={Boolean(peopleOf)} onHide={() => setPeopleOf(null)} centered scrollable>
+        <Modal.Header closeButton>
+          <Modal.Title style={{ fontSize: '1.05rem' }}>{peopleOf?.name} · {peopleOf ? membersOf(peopleOf).all.length : 0} employee(s)</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {peopleOf && membersOf(peopleOf).all.length === 0 && <p className="text-muted small mb-0">No employees in this shift.</p>}
+          {peopleOf && membersOf(peopleOf).all.map((emp) => {
+            const ids = idsOf(emp);
+            const viaDefault = activeIdsOf(emp).length === 0;
+            const others = ids.filter((id) => id !== peopleOf._id).map((id) => shifts.find((x) => x._id === id)?.name).filter(Boolean);
+            return (
+              <div key={emp._id} className="d-flex justify-content-between align-items-center py-2 border-bottom">
+                <div>
+                  <div className="fw-semibold">{emp.name}</div>
+                  <div className="small text-muted">{emp.employeeId} · {emp.position || emp.department || 'Employee'}</div>
+                </div>
+                <div className="text-end small">
+                  {viaDefault && <Badge bg="light" text="dark">Default (no shift assigned)</Badge>}
+                  {!viaDefault && ids[0] === peopleOf._id && ids.length > 1 && <Badge bg="primary">Primary</Badge>}
+                  {others.length > 0 && <div className="text-muted mt-1">Also: {others.join(', ')}</div>}
+                </div>
+              </div>
+            );
+          })}
+        </Modal.Body>
       </Modal>
 
       {/* Create / edit shift */}
