@@ -145,7 +145,7 @@ const ADMIN_CHAPTERS = [
       'Use the Approved and Rejected tabs to look back or change a decision.',
     ],
     tips: [
-      'A pending record is approved automatically 10 minutes after the employee punches out, unless you act on it first.',
+      'A pending record is approved automatically 5 minutes after the employee punches out, unless you act on it first.',
       'Records the system closed in the past (older versions closed forgotten punch-outs automatically) are never auto-approved. Check them and correct the punch-out time in Manual Attendance.',
     ],
   },
@@ -449,7 +449,7 @@ const EMPLOYEE_CHAPTERS = [
       'Attendance lists your punches with hours and status (Pending, Approved, Rejected).',
       'To download your attendance report, choose the start and end dates and click Download CSV.',
     ],
-    tips: ['Pending attendance is usually approved automatically 10 minutes after you punch out.'],
+    tips: ['Pending attendance is usually approved automatically 5 minutes after you punch out.'],
   },
   {
     id: 'e-leave',
