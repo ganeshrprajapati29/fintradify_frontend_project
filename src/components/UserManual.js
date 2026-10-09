@@ -22,7 +22,7 @@ const ADMIN_CHAPTERS = [
       'Ask employees to install the AeroAttendance app, sign in with their email, and allow location ("Allow all the time" on Android) and notifications.',
     ],
     tips: [
-      'Assign the Night Shift to people who work at night. Otherwise they are marked late and their attendance is auto-closed at the wrong time.',
+      'Assign the Night Shift to people who work at night. Otherwise they are marked late and their punch-outs are flagged as missed at the wrong time.',
       'Set the punch radius small enough to stop punching from home, but not so small that GPS drift blocks people inside the building.',
     ],
   },
@@ -146,7 +146,7 @@ const ADMIN_CHAPTERS = [
     ],
     tips: [
       'A pending record is approved automatically 10 minutes after the employee punches out, unless you act on it first.',
-      'Auto-closed records (the employee forgot to punch out) are never auto-approved. Check them and correct the punch-out time in Manual Attendance if needed.',
+      'Records the system closed in the past (older versions closed forgotten punch-outs automatically) are never auto-approved. Check them and correct the punch-out time in Manual Attendance.',
     ],
   },
   {
@@ -162,7 +162,7 @@ const ADMIN_CHAPTERS = [
       'Saving the same employee, day and shift again corrects that record. Tick "Add as a new session" to add another shift on the same day (for example an evening shift after a morning shift). Overlapping times are refused.',
       'Add a reason or note, choose Office or WFH and Approved or Pending. Late, early-out and overtime are worked out from the shift automatically.',
       'Mark many employees: pick a day and Holiday, Half day, Present at shift time or Remove holiday, for all active employees or the ones you tick. Present skips anyone who already punched.',
-      'Missed punch-outs: sessions still open after the shift ended, or closed automatically, with the shift end suggested as punch-out. Adjust if needed and click "Save & approve".',
+      'Missed punch-outs: employees who forgot to punch out (6 hours after the shift end), with the shift end suggested as punch-out. Adjust if needed and click "Save & approve".',
       'In Attendance records every session is a separate row with tags for session number, extra shift, late, auto-closed and who entered it (App, Admin or Bulk). Edit lets you change the punch date and time, shift, status, mode, holiday, half day and note.',
     ],
   },
@@ -197,7 +197,7 @@ const ADMIN_CHAPTERS = [
     ],
     tips: [
       'Late = punch-in after start time + grace minutes. Punching in after the shift has already ended is treated as working outside shift hours, not as late.',
-      'If someone does not punch out, the record is closed automatically 6 hours after their shift end and is left pending for your review.',
+      'Attendance is never punched in or out automatically. If someone does not punch out, 6 hours after their shift end the session is listed under Manual Attendance → Missed punch-outs for you to enter the real time; their hours count only after that, and they can still punch in normally the next day.',
       'The working days of a shift decide the weekly off (WO) in the attendance report.',
     ],
   },
@@ -387,7 +387,7 @@ const ADMIN_CHAPTERS = [
     summary: 'Quick answers to the questions HR asks most often.',
     faq: [
       ['An employee says they cannot punch in.', 'They are probably outside the punch area. Check their location on Live Tracking and the radius in Attendance Locations. Also check that location is turned on in the phone. On a WFH day, approve their WFH request first.'],
-      ['Someone forgot to punch out.', 'The record closes automatically 6 hours after their shift ends and stays pending. Correct the punch-out time in Manual Attendance, then approve it.'],
+      ['Someone forgot to punch out.', 'Nothing is punched out automatically. 6 hours after the shift end the session appears in Manual Attendance → Missed punch-outs. Enter the real punch-out time and click Save & approve.'],
       ['A night-shift worker shows as late or absent.', 'Assign them the Night Shift in Shifts. Their attendance then belongs to the day the shift started.'],
       ['Live Tracking shows only the punch-in point.', "The employee's phone is not sending live location. Ask them to update the app, set location to \"Allow all the time\", and turn off battery saver for AeroAttendance."],
       ['The attendance report shows A on a holiday.', 'In Manual Attendance, create or edit the record for that day and tick Holiday, then download the report again.'],
@@ -425,7 +425,7 @@ const EMPLOYEE_CHAPTERS = [
     ],
     tips: [
       'If punch-in fails with "outside the allowed area", move closer to the office or contact HR.',
-      'If you forget to punch out, your attendance is closed automatically and HR has to review it, so always punch out.',
+      'If you forget to punch out, your hours are not counted until HR enters the real punch-out time, so always punch out.',
       'While you are on duty the app shares your location with HR. A notification shows that sharing is on, and it stops when you punch out.',
     ],
   },

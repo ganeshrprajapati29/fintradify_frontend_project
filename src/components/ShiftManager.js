@@ -206,7 +206,7 @@ const ShiftManager = () => {
             <h3 className="fw-bold mb-1" style={{ fontSize: '1.35rem' }}>Work shifts</h3>
             <p className="text-muted small mb-0">
               Create day, evening and night shifts and assign employees. Late marks, punch-out reminders and
-              auto-close follow each employee's shift. Night shifts that end the next morning are handled as one attendance.
+              missed punch-outs follow each employee's shift. Night shifts that end the next morning are handled as one attendance.
               An employee can have more than one shift: the shift nearest to the punch time is used, with one attendance per shift.
             </p>
           </div>

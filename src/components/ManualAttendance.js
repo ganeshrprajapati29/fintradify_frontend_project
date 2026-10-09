@@ -526,7 +526,7 @@ const ManualAttendance = () => {
           <div className="d-flex flex-wrap justify-content-between gap-2">
             <div>
               <h4>Missed punch-outs</h4>
-              <div className="sub">Sessions still open after their shift ended, or closed automatically. The suggested time is the shift end; change it if needed and save.</div>
+              <div className="sub">Employees who forgot to punch out. Nothing is punched out automatically: enter the real punch-out time (the shift end is suggested) and save.</div>
             </div>
             <button type="button" className="ma-btn sm" onClick={loadMissed}>Refresh</button>
           </div>
@@ -542,7 +542,7 @@ const ManualAttendance = () => {
                     <td>{fmtDay(r.dateKey)}</td>
                     <td>{r.shift?.name ? `${r.shift.name} (${to12h(r.shift.startTime)}–${to12h(r.shift.endTime)})` : '—'}</td>
                     <td>{fmtTime(r.punchIn)}</td>
-                    <td>{r.autoClosed ? <span className="ma-tag auto">Auto-closed {fmtTime(r.punchOut)}</span> : <span className="ma-tag late">Still open</span>}</td>
+                    <td>{r.autoClosed ? <span className="ma-tag auto">Closed by system earlier {fmtTime(r.punchOut)}</span> : <span className="ma-tag late">Still open</span>}</td>
                     <td><input type="datetime-local" className="ma-input" style={{ minWidth: 190 }} value={missedOut[r._id] || ''} onChange={(e) => setMissedOut({ ...missedOut, [r._id]: e.target.value })} /></td>
                     <td className="text-end"><button type="button" className="ma-btn green sm" disabled={saving} onClick={() => fixMissed(r)}>Save &amp; approve</button></td>
                   </tr>
