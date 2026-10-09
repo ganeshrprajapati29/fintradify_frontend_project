@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Alert, Button, Card, Col, Form, Row } from 'react-bootstrap';
 import api from '../utils/axios';
 import EmployeeLocationManager from './EmployeeLocationManager';
+import ShiftAreaManager from './ShiftAreaManager';
 
 const DEFAULTS = {
   officeLatitude: 28.595339,
@@ -84,7 +85,7 @@ const AdminAttendanceRadius = () => {
     setSuccess('');
     try {
       await api.put('/settings/attendance', form);
-      setSuccess('Attendance radius updated successfully.');
+      setSuccess('Office area saved. Shift areas and employee areas were not changed.');
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update attendance radius');
     } finally {
@@ -155,11 +156,12 @@ const AdminAttendanceRadius = () => {
       </style>
 
       <section className="radius-hero">
-        <p className="radius-eyebrow">Office geofence</p>
+        <p className="radius-eyebrow">Punch areas</p>
         <h2 className="radius-title">Attendance Radius</h2>
         <p className="radius-subtitle">
-          Set the office location and the maximum distance (in meters) an employee must be within to punch in/out in Work From Office mode.
-          Approved Work From Home requests bypass this check entirely.
+          There are three separate kinds of punch area: 1) the office area, for everyone; 2) a shift area, for everyone in that shift;
+          3) an employee's own area. An employee can punch in or out inside any of their areas, as many times a day as they work.
+          Each area is saved on its own and saving one never changes another. Approved Work From Home days skip the check.
         </p>
       </section>
 
@@ -167,6 +169,7 @@ const AdminAttendanceRadius = () => {
       {success && <Alert variant="success">{success}</Alert>}
 
       <Card className="radius-panel">
+        <p className="radius-eyebrow" style={{ marginBottom: 4 }}>Step 1 · Office area (everyone)</p>
         {loading ? (
           <p>Loading current settings...</p>
         ) : (
@@ -225,6 +228,7 @@ const AdminAttendanceRadius = () => {
         )}
       </Card>
 
+      {!loading && <ShiftAreaManager office={form} />}
       {!loading && <EmployeeLocationManager office={form} />}
     </div>
   );

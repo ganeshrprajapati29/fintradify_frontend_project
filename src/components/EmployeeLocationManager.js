@@ -49,12 +49,14 @@ const EmployeeLocationManager = ({ office }) => {
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [shifts, setShifts] = useState([]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [employeesRes, trackingRes] = await Promise.allSettled([api.get('/employees'), api.get('/tracking')]);
+      const [employeesRes, trackingRes, shiftsRes] = await Promise.allSettled([api.get('/employees'), api.get('/tracking'), api.get('/shifts')]);
       if (employeesRes.status !== 'fulfilled') throw employeesRes.reason;
+      if (shiftsRes.status === 'fulfilled') setShifts(asList(shiftsRes.value.data));
       setEmployees(asList(employeesRes.value.data).filter((emp) => emp.role !== 'admin' && emp.status !== 'terminated'));
       if (trackingRes.status === 'fulfilled') {
         const seen = {};
@@ -82,6 +84,14 @@ const EmployeeLocationManager = ({ office }) => {
   }, [employees, query]);
 
   const assignedCount = employees.filter((emp) => emp.attendanceLocation?.enabled).length;
+
+  // Shift areas that also apply to an employee (their shifts, or the default shift).
+  const shiftAreasOf = (emp) => {
+    const ids = Array.isArray(emp.shifts) && emp.shifts.length ? emp.shifts.map(String) : emp.shift ? [String(emp.shift)] : [];
+    const own = ids.map((id) => shifts.find((s) => s._id === id)).filter(Boolean);
+    const list = own.length ? own : shifts.filter((s) => s.isDefault);
+    return list.filter((s) => s.location);
+  };
 
   const openEditor = (emp) => {
     const own = emp.attendanceLocation || {};
@@ -167,7 +177,7 @@ const EmployeeLocationManager = ({ office }) => {
     <Card className="radius-card mt-3">
       <div className="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
         <div>
-          <p className="radius-eyebrow">Employee-specific punch areas</p>
+          <p className="radius-eyebrow">Step 3 · Employee areas</p>
           <h4 className="radius-title" style={{ fontSize: '1.2rem' }}>Where can each employee punch?</h4>
           <p className="text-muted small mb-0">
             Everyone can punch inside the office area above. Give an employee their own location and radius (site, warehouse,
@@ -195,9 +205,9 @@ const EmployeeLocationManager = ({ office }) => {
             <thead>
               <tr>
                 <th>Employee</th>
-                <th>Punch area</th>
-                <th>Radius</th>
-                <th>Coordinates</th>
+                <th>Can punch at</th>
+                <th>Own area radius</th>
+                <th>Own area coordinates</th>
                 <th className="text-end">Action</th>
               </tr>
             </thead>
@@ -212,11 +222,15 @@ const EmployeeLocationManager = ({ office }) => {
                       <div className="small text-muted">{emp.employeeId} · {emp.position || emp.department || 'Employee'}</div>
                     </td>
                     <td>
-                      {active
-                        ? <Badge bg="" style={{ background: '#ede9fe', color: '#6d28d9' }}>{own.label || 'Assigned location'}</Badge>
-                        : <Badge bg="" style={{ background: '#eef1fc', color: '#0a1f8f' }}>Office (default)</Badge>}
+                      <div className="d-flex flex-wrap gap-1">
+                        <Badge bg="" style={{ background: '#eef1fc', color: '#0a1f8f' }}>Office · {office?.officeRadiusMeters ?? 100} m</Badge>
+                        {shiftAreasOf(emp).map((s) => (
+                          <Badge key={s._id} bg="" style={{ background: '#e0f2fe', color: '#0369a1' }}>{s.location.label || `${s.name} area`} · {Math.round(s.location.radiusMeters)} m</Badge>
+                        ))}
+                        {active && <Badge bg="" style={{ background: '#ede9fe', color: '#6d28d9' }}>{own.label || 'Own area'} · {Math.round(own.radiusMeters)} m</Badge>}
+                      </div>
                     </td>
-                    <td>{active ? `${Math.round(own.radiusMeters)} m` : `${office?.officeRadiusMeters ?? 100} m`}</td>
+                    <td>{active ? `${Math.round(own.radiusMeters)} m` : <span className="text-muted small">Not set</span>}</td>
                     <td className="small text-muted">
                       {active ? `${Number(own.latitude).toFixed(5)}, ${Number(own.longitude).toFixed(5)}` : '—'}
                     </td>

@@ -211,6 +211,8 @@ const ADMIN_CHAPTERS = [
     steps: [
       'Office: click on the map or enter latitude and longitude, set the radius in metres, and save.',
       'Per employee: in the employee list below the map, click Edit on the employee, switch on "Also allow punching at this place", click the map to place the point, set the radius and save. That employee can then punch inside their own area and also inside the office area.',
+      'Shift areas (Step 2): click Set area on a shift and place its point on the map. Everyone in that shift can then punch there too, for example the Ghaziabad or Ahmedabad office.',
+      'An employee can punch inside any of their areas: the office area, the area of each of their shifts, and their own area. Saving one area never changes the others.',
       'Approved Work From Home days skip the location check.',
     ],
     tips: ['The office point is also the centre of the Live Tracking radar.'],
