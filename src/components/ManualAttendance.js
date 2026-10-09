@@ -590,6 +590,7 @@ const ManualAttendance = () => {
                       {(r.session || 1) > 1 && <span className="ma-tag src">Session {r.session}</span>}
                       {r.extraShift && <span className="ma-tag extra">Extra shift</span>}
                       {r.isLate && <span className="ma-tag late">Late {r.lateMinutes}m</span>}
+                      {(r.outsideIn || r.outsideOut) && <span className="ma-tag late" title={r.outsideArea}>Outside area ({r.outsideIn ? `in ${r.outsideInMeters} m` : ''}{r.outsideIn && r.outsideOut ? ', ' : ''}{r.outsideOut ? `out ${r.outsideOutMeters} m` : ''})</span>}
                       {r.autoClosed && <span className="ma-tag auto">Auto-closed</span>}
                       {r.halfDay && r.punchIn && <span className="ma-tag half">Half day</span>}
                       <span className="ma-tag src">{SOURCE_LABEL[r.source] || 'App'}</span>

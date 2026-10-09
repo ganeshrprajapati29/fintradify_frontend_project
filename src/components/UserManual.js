@@ -215,6 +215,7 @@ const ADMIN_CHAPTERS = [
       'Shift areas (Step 3, optional): click Set area on a shift and place its point on the map. Everyone in that shift can then punch there too.',
       'Employees (Step 4): "Sites" chooses the work locations of an employee, the "Field mode" switch lets drivers and field staff punch from anywhere (their live location is tracked while on duty), and "Own area" adds a personal place.',
       'Fake GPS (mock location) apps are detected by the app and such punches are refused, in every mode.',
+      'Punching outside every allowed area is not blocked: the punch is recorded, marked "Outside area" with the distance, the employee gets a message and HR gets a notification. Use the "Outside area" filter in Attendance Approvals to review them.',
       'An employee can punch inside any of their areas: the office area, the area of each of their shifts, and their own area. Saving one area never changes the others.',
       'Approved Work From Home days skip the location check.',
     ],
@@ -391,7 +392,7 @@ const ADMIN_CHAPTERS = [
     where: 'Troubleshooting',
     summary: 'Quick answers to the questions HR asks most often.',
     faq: [
-      ['An employee says they cannot punch in.', 'They are probably outside the punch area. Check their location on Live Tracking and the radius in Attendance Locations. Also check that location is turned on in the phone. On a WFH day, approve their WFH request first.'],
+      ['A punch shows "Outside area".', 'The employee punched outside every area allowed for them. The punch is recorded and you are notified. Check the place on Live Tracking, then approve or reject it in Attendance Approvals. If they work there regularly, add that place as a work location or their own area.'],
       ['Someone forgot to punch out.', 'Nothing is punched out automatically. 6 hours after the shift end the session appears in Manual Attendance → Missed punch-outs. Enter the real punch-out time and click Save & approve.'],
       ['A night-shift worker shows as late or absent.', 'Assign them the Night Shift in Shifts. Their attendance then belongs to the day the shift started.'],
       ['Live Tracking shows only the punch-in point.', "The employee's phone is not sending live location. Ask them to update the app, set location to \"Allow all the time\", and turn off battery saver for AeroAttendance."],

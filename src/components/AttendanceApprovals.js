@@ -14,6 +14,7 @@ const FLAGS = [
   ['late', 'Late'],
   ['autoClosed', 'Auto-closed'],
   ['wfh', 'Work from home'],
+  ['outside', 'Outside area'],
 ];
 
 const formatTime = (value) => (value
@@ -130,7 +131,7 @@ const AttendanceApprovals = () => {
     ['Pending today', summary.pendingToday ?? 0, '#0a1f8f', () => { setStatus('pending'); setFlag(''); setDate(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })); setPage(1); }],
     ['Still working', summary.pendingOpen ?? 0, '#2563eb', () => { setStatus('pending'); setFlag('open'); setPage(1); }],
     ['Late punch in', summary.pendingLate ?? 0, '#dc2626', () => { setStatus('pending'); setFlag('late'); setPage(1); }],
-    ['Auto-closed', summary.pendingAutoClosed ?? 0, '#7c3aed', () => { setStatus('pending'); setFlag('autoClosed'); setPage(1); }],
+    ['Outside area', summary.pendingOutside ?? 0, '#b91c1c', () => { setStatus('pending'); setFlag('outside'); setPage(1); }],
     ['Approved today', summary.approvedToday ?? 0, '#16a34a', () => { setStatus('approved'); setFlag(''); setDate(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })); setPage(1); }],
   ], [summary]);
 
@@ -296,6 +297,7 @@ const AttendanceApprovals = () => {
                       <strong>{formatTime(record.punchIn)}</strong>
                       {record.isLate && <div><span className="aa-tag late">Late {record.lateMinutes ? `${record.lateMinutes}m` : ''}</span></div>}
                       {record.extraShift && <div><span className="aa-tag auto">Extra shift</span></div>}
+                      {(record.outsideIn || record.outsideOut) && <div><span className="aa-tag late" title={record.outsideArea}>Outside area ({record.outsideIn ? `in ${record.outsideInMeters} m` : ''}{record.outsideIn && record.outsideOut ? ', ' : ''}{record.outsideOut ? `out ${record.outsideOutMeters} m` : ''})</span></div>}
                       {(record.session || 1) > 1 && !record.extraShift && <div><span className="aa-tag office">Session {record.session}</span></div>}
                       {(record.source === 'manual' || record.source === 'bulk') && <div><span className="aa-tag wfh">Entered by admin</span></div>}
                     </td>

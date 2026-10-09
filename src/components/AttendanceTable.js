@@ -755,6 +755,7 @@ const AttendanceTable = ({ isEmployee }) => {
                       {(attendance.session || 1) > 1 && <div><Badge bg="light" text="dark">Session {attendance.session}</Badge></div>}
                       {attendance.extraShift && <div><Badge bg="" style={{ background: '#ede9fe', color: '#6d28d9' }}>Extra shift</Badge></div>}
                       {attendance.isLate && <div><Badge bg="" style={{ background: '#fee2e2', color: '#b91c1c' }}>Late {attendance.lateMinutes || ''}m</Badge></div>}
+                      {(attendance.outsideIn || attendance.outsideOut) && <div><Badge bg="" style={{ background: '#fff7ed', color: '#c2410c' }} title={attendance.outsideArea}>Outside area ({attendance.outsideIn ? `in ${attendance.outsideInMeters} m` : ''}{attendance.outsideIn && attendance.outsideOut ? ', ' : ''}{attendance.outsideOut ? `out ${attendance.outsideOutMeters} m` : ''})</Badge></div>}
                     </td>
                     <td>{formatTime(attendance.punchOut)}</td>
                     <td>{getHoursWorked(attendance)}</td>
