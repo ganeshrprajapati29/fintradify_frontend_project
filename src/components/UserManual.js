@@ -104,6 +104,7 @@ const ADMIN_CHAPTERS = [
       'Click an employee (on the map, the radar or the list) to open their details: what they are doing now, punch-in time, hours, battery and distance from office.',
       "Route timeline: the employee's day as a story. You see punch in, each stop with how long they stayed, each journey with distance and average speed, and punch out. Click a row to zoom the map to it. Pick another date to see an older day.",
       '"Follow live" keeps the map centred on the selected employee as new locations arrive.',
+      'People → Employee Locations shows only the people who share location from the app (Live now, Last 24 h, All). Click a person to see their live position on a large map, the exact route of the day point by point with time, address and speed, and pick any date to see an older route.',
       'Play route: replays the selected day like a video. The blue marker walks along the route with the time shown, and you can drag the slider or choose 1x, 3x or 10x speed.',
       'Route check tells you if a field route looks genuine. Jumps that are impossible by road (more than 150 km/h) are flagged as a possible fake location or wrong GPS fix and drawn as an orange dashed line. Long gaps with no location (phone off or app closed) are listed too. Click a line to zoom the map there.',
       'Stops without an address have a "Find address" link that looks up the place name.',

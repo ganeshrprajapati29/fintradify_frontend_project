@@ -33,6 +33,7 @@ import AdminReimbursement from './AdminReimbursement';
 import Notification from './Notification';
 import EmployeeTeams from './EmployeeTeams';
 import EmployeeTracking from './EmployeeTracking';
+import EmployeeLocationTracker from './EmployeeLocationTracker';
 import AttendanceApprovals from './AttendanceApprovals';
 import DashboardLiveOps from './DashboardLiveOps';
 import UserManual from './UserManual';
@@ -63,6 +64,7 @@ const ADMIN_TABS = [
   'unblock-employees',
   'teams',
   'tracking',
+  'employee-locations',
   'attendance',
   'attendance-approvals',
   'manual-attendance',
@@ -97,6 +99,7 @@ const TAB_LABELS = {
   'unblock-employees': 'Unblock Employees',
   teams: 'Teams',
   tracking: 'Live Tracking',
+  'employee-locations': 'Employee Locations',
   attendance: 'Attendance',
   'attendance-approvals': 'Attendance Approvals',
   'manual-attendance': 'Manual Attendance',
@@ -123,7 +126,7 @@ const TAB_LABELS = {
 
 const ADMIN_NAV_GROUPS = [
   { title: 'Overview', items: ['overview', 'reports-center'] },
-  { title: 'People', items: ['add-employee', 'edit-employee', 'employee-list', 'block-employees', 'unblock-employees', 'teams', 'tracking'] },
+  { title: 'People', items: ['add-employee', 'edit-employee', 'employee-list', 'block-employees', 'unblock-employees', 'teams', 'tracking', 'employee-locations'] },
   { title: 'Attendance & Leave', items: ['attendance', 'attendance-approvals', 'manual-attendance', 'active-attendance', 'leaves', 'paid-leaves', 'wfh', 'attendance-radius', 'shifts'] },
   { title: 'Work & Payroll', items: ['monthly-performance', 'tasks', 'salary', 'reimbursements'] },
   { title: 'HR Documents', items: ['relieving-letter', 'offer-letter', 'certificates', 'documents', 'compliance-center'] },
@@ -137,6 +140,7 @@ const renderAdminNavIcon = (tab) => (
     {tab === 'reports-center' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 19h16M7 16V9m5 7V5m5 11v-4M6 5h12" />}
     {['add-employee', 'edit-employee', 'employee-list', 'block-employees', 'unblock-employees', 'teams'].includes(tab) && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m4 6v-2a4 4 0 00-8 0v2m12-10a4 4 0 11-8 0 4 4 0 018 0zm6 1a3 3 0 11-6 0 3 3 0 016 0z" />}
     {tab === 'tracking' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 11a3 3 0 100-6 3 3 0 000 6zm0 10s7-4.5 7-11a7 7 0 10-14 0c0 6.5 7 11 7 11z" />}
+    {tab === 'employee-locations' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />}
     {tab === 'user-manual' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />}
     {tab === 'attendance-approvals' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4M8 7V3m8 4V3M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />}
     {['attendance', 'manual-attendance', 'active-attendance', 'leaves', 'paid-leaves'].includes(tab) && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3M5 11h14M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />}
@@ -2457,6 +2461,11 @@ const AdminDashboard = () => {
             {activeTab === 'attendance-approvals' && (
               <div className="animate__animated animate__fadeInUp">
                 <AttendanceApprovals />
+              </div>
+            )}
+            {activeTab === 'employee-locations' && (
+              <div className="animate__animated animate__fadeInUp">
+                <EmployeeLocationTracker />
               </div>
             )}
             {activeTab === 'tracking' && (
