@@ -527,6 +527,24 @@ const RolePermissions = () => {
                 <option value="manager">Manager</option>
                 <option value="admin">Admin</option>
               </Form.Select>
+              <div className="d-flex flex-wrap gap-2 mt-2">
+                {[
+                  ['employee', 'Employee'],
+                  ['hr', 'HR'],
+                  ['manager', 'Manager'],
+                  ['admin', 'Admin'],
+                ].map(([value, label]) => (
+                  <Button
+                    key={value}
+                    type="button"
+                    size="sm"
+                    variant={role === value ? 'primary' : 'outline-primary'}
+                    onClick={() => setRole(value)}
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </div>
             </Form.Group>
             <div className="row g-3">
               {ACCESS_MODULES.map((module) => (
