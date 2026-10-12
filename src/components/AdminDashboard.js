@@ -2,7 +2,7 @@
 import axios from 'axios';
 import { Bar, Line, Pie, Doughnut } from 'react-chartjs-2';
 import { useHistory } from 'react-router-dom';
-import { Container, Navbar, Nav, Button, Card, Table, Alert, Offcanvas, Badge } from 'react-bootstrap';
+import { Container, Navbar, Nav, Button, Card, Table, Alert, Offcanvas, Badge, Form } from 'react-bootstrap';
 import {
   Chart as ChartJS,
   BarElement,
@@ -60,6 +60,7 @@ const ADMIN_TABS = [
   'add-employee',
   'edit-employee',
   'employee-list',
+  'role-permissions',
   'block-employees',
   'unblock-employees',
   'teams',
@@ -95,6 +96,7 @@ const TAB_LABELS = {
   'add-employee': 'Add Employee',
   'edit-employee': 'Edit Employee',
   'employee-list': 'Employee List',
+  'role-permissions': 'Roles & Permissions',
   'block-employees': 'Block Employees',
   'unblock-employees': 'Unblock Employees',
   teams: 'Teams',
@@ -126,13 +128,41 @@ const TAB_LABELS = {
 
 const ADMIN_NAV_GROUPS = [
   { title: 'Overview', items: ['overview', 'reports-center'] },
-  { title: 'People', items: ['add-employee', 'edit-employee', 'employee-list', 'block-employees', 'unblock-employees', 'teams', 'tracking', 'employee-locations'] },
+  { title: 'People', items: ['add-employee', 'edit-employee', 'employee-list', 'role-permissions', 'block-employees', 'unblock-employees', 'teams', 'tracking', 'employee-locations'] },
   { title: 'Attendance & Leave', items: ['attendance', 'attendance-approvals', 'manual-attendance', 'active-attendance', 'leaves', 'paid-leaves', 'wfh', 'attendance-radius', 'shifts'] },
   { title: 'Work & Payroll', items: ['monthly-performance', 'tasks', 'salary', 'reimbursements'] },
   { title: 'HR Documents', items: ['relieving-letter', 'offer-letter', 'certificates', 'documents', 'compliance-center'] },
   { title: 'System', items: ['notifications', 'login-credentials', 'settings'] },
   { title: 'Help', items: ['user-manual'] },
 ];
+
+const ACCESS_MODULES = [
+  { key: 'people', label: 'People', tabs: ['add-employee', 'edit-employee', 'employee-list', 'role-permissions', 'block-employees', 'unblock-employees', 'teams'] },
+  { key: 'overview', label: 'Dashboard & Reports', tabs: ['overview', 'reports-center', 'monthly-performance'] },
+  { key: 'attendance', label: 'Attendance & Tracking', tabs: ['attendance', 'attendance-approvals', 'manual-attendance', 'active-attendance', 'paid-leaves', 'attendance-radius', 'shifts', 'tracking', 'employee-locations'] },
+  { key: 'leave', label: 'Leave Requests', tabs: ['leaves'] },
+  { key: 'workFromHome', label: 'Work From Home', tabs: ['wfh'] },
+  { key: 'tasks', label: 'Tasks', tabs: ['tasks'] },
+  { key: 'salary', label: 'Salary Slips', tabs: ['salary'] },
+  { key: 'documents', label: 'HR Documents', tabs: ['relieving-letter', 'offer-letter', 'certificates', 'documents', 'compliance-center'] },
+  { key: 'reimbursements', label: 'Reimbursements', tabs: ['reimbursements'] },
+  { key: 'settings', label: 'System Settings', tabs: ['settings', 'login-credentials'] },
+];
+
+const tabToAccessKey = ADMIN_TABS.reduce((acc, tab) => {
+  const module = ACCESS_MODULES.find((item) => item.tabs.includes(tab));
+  acc[tab] = module?.key || 'overview';
+  return acc;
+}, { notifications: 'overview', 'user-manual': 'overview' });
+
+const hasTabAccess = (profile, tab) => {
+  const role = profile.role || 'admin';
+  if (role === 'admin') return true;
+  if (['role-permissions', 'login-credentials'].includes(tab)) return false;
+  const accessKey = tabToAccessKey[tab];
+  if (!accessKey) return true;
+  return profile.access?.[accessKey] !== false;
+};
 
 const renderAdminNavIcon = (tab) => (
   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -349,6 +379,139 @@ const EmployeeList = ({ mode }) => {
   );
 };
 
+const RolePermissions = () => {
+  const [employees, setEmployees] = useState([]);
+  const [selectedId, setSelectedId] = useState('');
+  const [role, setRole] = useState('employee');
+  const [access, setAccess] = useState({});
+  const [reason, setReason] = useState('');
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const fetchEmployees = async () => {
+    try {
+      const res = await axios.get(`${process.env.REACT_APP_API_URL}/employees`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
+      setEmployees(res.data || []);
+      setError('');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to fetch employees');
+    }
+  };
+
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
+
+  const selectedEmployee = employees.find((employee) => employee._id === selectedId);
+
+  const selectEmployee = (id) => {
+    const employee = employees.find((item) => item._id === id);
+    setSelectedId(id);
+    setRole(employee?.role || 'employee');
+    setAccess({ ...(employee?.access || {}) });
+    setReason('');
+    setMessage('');
+    setError('');
+  };
+
+  const toggleAccess = (key) => {
+    setAccess((current) => ({ ...current, [key]: !(current[key] !== false) }));
+  };
+
+  const savePermissions = async () => {
+    if (!selectedEmployee) {
+      setError('Please select an employee first');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    setMessage('');
+    try {
+      const res = await axios.put(
+        `${process.env.REACT_APP_API_URL}/employees/${selectedEmployee._id}/role-permissions`,
+        { role, access, reason },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
+      setMessage(res.data?.message || 'Permissions updated successfully');
+      await fetchEmployees();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update permissions');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="admin-directory">
+      <section className="admin-directory-hero">
+        <div>
+          <p className="admin-directory-eyebrow">Access control</p>
+          <h3>Roles & Permissions</h3>
+          <p>Select HR or manager role, then switch on only the modules that account can manage.</p>
+        </div>
+        <div className="admin-directory-stats">
+          <span>{employees.length} accounts</span>
+          <span>{employees.filter((emp) => ['admin', 'hr', 'manager'].includes(emp.role)).length} staff roles</span>
+        </div>
+      </section>
+      {error && <Alert variant="danger">{error}</Alert>}
+      {message && <Alert variant="success">{message}</Alert>}
+      <section className="admin-directory-card">
+        <Form.Group className="mb-3">
+          <Form.Label>Employee / Staff Account</Form.Label>
+          <Form.Select value={selectedId} onChange={(event) => selectEmployee(event.target.value)}>
+            <option value="">Select employee</option>
+            {employees.map((employee) => (
+              <option key={employee._id} value={employee._id}>
+                {employee.employeeId || 'N/A'} - {employee.name} ({employee.email})
+              </option>
+            ))}
+          </Form.Select>
+        </Form.Group>
+        {selectedEmployee && (
+          <>
+            <Form.Group className="mb-3">
+              <Form.Label>Role</Form.Label>
+              <Form.Select value={role} onChange={(event) => setRole(event.target.value)}>
+                <option value="employee">Employee</option>
+                <option value="hr">HR</option>
+                <option value="manager">Manager</option>
+                <option value="admin">Admin</option>
+              </Form.Select>
+            </Form.Group>
+            <div className="row g-3">
+              {ACCESS_MODULES.map((module) => (
+                <div className="col-md-6 col-xl-4" key={module.key}>
+                  <Form.Check
+                    type="switch"
+                    id={`access-${module.key}`}
+                    label={module.label}
+                    checked={role === 'admin' || access[module.key] !== false}
+                    disabled={role === 'admin'}
+                    onChange={() => toggleAccess(module.key)}
+                  />
+                </div>
+              ))}
+            </div>
+            <Form.Group className="mt-3">
+              <Form.Label>Reason / note</Form.Label>
+              <Form.Control value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Example: HR can manage attendance and leave only" />
+            </Form.Group>
+            <div className="admin-submit-row">
+              <Button className="admin-submit-btn" onClick={savePermissions} disabled={saving}>
+                {saving ? 'Saving...' : 'Save Role & Permissions'}
+              </Button>
+            </div>
+          </>
+        )}
+      </section>
+    </div>
+  );
+};
+
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }));
@@ -394,13 +557,19 @@ const AdminDashboard = () => {
     const fetchProfile = async () => {
       try {
         const res = await axios.get(`${process.env.REACT_APP_API_URL}/employees/profile`, { headers: authHeaders });
-        setProfile(res.data || {});
+        setProfile(res.data?.data || res.data || {});
       } catch (err) {
         console.error('Error fetching profile:', err);
       }
     };
     fetchProfile();
   }, []);
+
+  useEffect(() => {
+    if (!profile.role || hasTabAccess(profile, activeTab)) return;
+    const firstAllowed = ADMIN_TABS.find((tab) => hasTabAccess(profile, tab)) || 'overview';
+    setActiveTab(firstAllowed);
+  }, [profile, activeTab]);
 
   // Live clock update
   useEffect(() => {
@@ -540,6 +709,7 @@ const AdminDashboard = () => {
     }, {})
   ).sort((a, b) => new Date(`${a[0]}-01`) - new Date(`${b[0]}-01`)).slice(-6);
   const activeNavLabel = TAB_LABELS[activeTab] || 'Dashboard';
+  const visibleTabs = ADMIN_TABS.filter((tab) => hasTabAccess(profile, tab));
 
   // Chart.js configuration
   const chartConfig = {
@@ -606,6 +776,11 @@ const AdminDashboard = () => {
   };
 
   const handleTabClick = (tab) => {
+    if (!hasTabAccess(profile, tab)) {
+      setError('You do not have permission to open this section.');
+      setShowSidebar(false);
+      return;
+    }
     setActiveTab(tab);
     setShowSidebar(false);
   };
@@ -613,7 +788,9 @@ const AdminDashboard = () => {
   const renderAdminGroupedNav = () => (
     <Nav className="admin-sidebar-nav sidebar-grouped-nav">
       {ADMIN_NAV_GROUPS.map((group) => {
-        const isOpen = group.items.includes(activeTab);
+        const items = group.items.filter((tab) => visibleTabs.includes(tab));
+        if (!items.length) return null;
+        const isOpen = items.includes(activeTab);
         return (
           <details className="sidebar-group" key={group.title} open={isOpen}>
             <summary className="sidebar-group-title">
@@ -623,7 +800,7 @@ const AdminDashboard = () => {
               </svg>
             </summary>
             <div className="sidebar-group-items">
-              {group.items.map((tab) => (
+              {items.map((tab) => (
                 <Nav.Link
                   key={tab}
                   className={`animate__animated animate__fadeInLeft ${activeTab === tab ? 'active' : ''}`}
@@ -1826,11 +2003,11 @@ const AdminDashboard = () => {
           </div>
           {renderAdminGroupedNav()}
           <Nav className="admin-sidebar-nav">
-            {ADMIN_TABS.map((tab) => (
+            {visibleTabs.map((tab) => (
               <Nav.Link
                 key={tab}
                 className={`animate__animated animate__fadeInLeft ${activeTab === tab ? 'active' : ''}`}
-                style={{ animationDelay: `${0.04 * ADMIN_TABS.findIndex((navItem) => navItem === tab)}s` }}
+                style={{ animationDelay: `${0.04 * visibleTabs.findIndex((navItem) => navItem === tab)}s` }}
                 onClick={() => handleTabClick(tab)}
                 aria-current={activeTab === tab ? 'page' : undefined}
               >
@@ -1977,11 +2154,11 @@ const AdminDashboard = () => {
               </div>
               {renderAdminGroupedNav()}
               <Nav className="admin-sidebar-nav">
-                {ADMIN_TABS.map((tab) => (
+                {visibleTabs.map((tab) => (
                   <Nav.Link
                     key={tab}
                     className={`animate__animated animate__fadeInLeft ${activeTab === tab ? 'active' : ''}`}
-                    style={{ animationDelay: `${0.04 * ADMIN_TABS.findIndex((navItem) => navItem === tab)}s` }}
+                    style={{ animationDelay: `${0.04 * visibleTabs.findIndex((navItem) => navItem === tab)}s` }}
                     onClick={() => handleTabClick(tab)}
                     aria-current={activeTab === tab ? 'page' : undefined}
                   >
@@ -2327,6 +2504,11 @@ const AdminDashboard = () => {
             {activeTab === 'employee-list' && (
               <div className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.2s' }}>
                 <EmployeeList />
+              </div>
+            )}
+            {activeTab === 'role-permissions' && (
+              <div className="animate__animated animate__fadeInUp" style={{ animationDelay: '0.2s' }}>
+                <RolePermissions />
               </div>
             )}
             {activeTab === 'block-employees' && (
