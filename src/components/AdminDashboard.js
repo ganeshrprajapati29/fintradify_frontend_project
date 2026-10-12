@@ -164,6 +164,12 @@ const hasTabAccess = (profile, tab) => {
   return profile.access?.[accessKey] !== false;
 };
 
+const hasModuleAccess = (profile, key) => {
+  const role = profile.role || 'admin';
+  if (role === 'admin') return true;
+  return profile.access?.[key] !== false;
+};
+
 const renderAdminNavIcon = (tab) => (
   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
     {tab === 'overview' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 19V9m5 10V5m5 14v-7m5 7V3" />}
@@ -444,6 +450,33 @@ const RolePermissions = () => {
     }
   };
 
+  const removeStaffAccess = async (employee) => {
+    if (!window.confirm(`Remove admin panel access for ${employee.name}?`)) return;
+    setSaving(true);
+    setError('');
+    setMessage('');
+    try {
+      const res = await axios.put(
+        `${process.env.REACT_APP_API_URL}/employees/${employee._id}/role-permissions`,
+        { role: 'employee', access: employee.access || {}, reason: 'Admin panel role removed' },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
+      setMessage(res.data?.message || 'Staff access removed');
+      if (selectedId === employee._id) {
+        setSelectedId('');
+        setRole('employee');
+        setAccess({});
+      }
+      await fetchEmployees();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to remove staff access');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const assignedStaff = employees.filter((employee) => ['admin', 'hr', 'manager'].includes(employee.role));
+
   return (
     <div className="admin-directory">
       <section className="admin-directory-hero">
@@ -454,7 +487,7 @@ const RolePermissions = () => {
         </div>
         <div className="admin-directory-stats">
           <span>{employees.length} accounts</span>
-          <span>{employees.filter((emp) => ['admin', 'hr', 'manager'].includes(emp.role)).length} staff roles</span>
+          <span>{assignedStaff.length} staff roles</span>
         </div>
       </section>
       {error && <Alert variant="danger">{error}</Alert>}
@@ -506,6 +539,57 @@ const RolePermissions = () => {
               </Button>
             </div>
           </>
+        )}
+      </section>
+      <section className="admin-directory-card mt-3">
+        <div className="admin-directory-card-header">
+          <div>
+            <p className="admin-directory-eyebrow">Assigned access</p>
+            <h4>{assignedStaff.length} HR / manager accounts</h4>
+          </div>
+        </div>
+        {assignedStaff.length ? (
+          <div className="table-responsive">
+            <Table className="admin-directory-table">
+              <thead>
+                <tr>
+                  <th>Account</th>
+                  <th>Role</th>
+                  <th>Allowed Modules</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {assignedStaff.map((employee) => (
+                  <tr key={employee._id}>
+                    <td>
+                      <strong>{employee.name}</strong>
+                      <span className="d-block text-muted small">{employee.email}</span>
+                    </td>
+                    <td><span className="admin-status active">{employee.role}</span></td>
+                    <td>
+                      {ACCESS_MODULES
+                        .filter((module) => employee.role === 'admin' || employee.access?.[module.key] !== false)
+                        .map((module) => module.label)
+                        .join(', ') || 'No modules'}
+                    </td>
+                    <td>
+                      <Button size="sm" variant="outline-primary" className="me-2" onClick={() => selectEmployee(employee._id)}>
+                        Edit
+                      </Button>
+                      {employee.role !== 'admin' && (
+                        <Button size="sm" variant="outline-danger" onClick={() => removeStaffAccess(employee)} disabled={saving}>
+                          Remove
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </div>
+        ) : (
+          <div className="admin-directory-empty">No HR or manager access assigned yet.</div>
         )}
       </section>
     </div>
@@ -581,6 +665,11 @@ const AdminDashboard = () => {
 
   // Fetch attendance overview
   useEffect(() => {
+    if (!profile.role) return;
+    if (!hasModuleAccess(profile, 'attendance')) {
+      setOverview({});
+      return;
+    }
     const fetchOverview = async () => {
       try {
         const res = await axios.get(`${process.env.REACT_APP_API_URL}/attendance/overview`, { headers: authHeaders });
@@ -594,48 +683,52 @@ const AdminDashboard = () => {
       }
     };
     fetchOverview();
-  }, []);
+  }, [profile]);
 
   // Fetch real admin dashboard data
   useEffect(() => {
+    if (!profile.role) return;
     const fetchDashboardData = async () => {
       try {
-        const [metricsRes, employeesRes, leavesRes, tasksRes, salaryRes, reimbursementRes, wfhRes] = await Promise.allSettled([
-          axios.get(`${process.env.REACT_APP_API_URL}/dashboard/metrics`, { headers: authHeaders }),
-          axios.get(`${process.env.REACT_APP_API_URL}/employees`, { headers: authHeaders }),
-          axios.get(`${process.env.REACT_APP_API_URL}/leaves`, { headers: authHeaders }),
-          axios.get(`${process.env.REACT_APP_API_URL}/tasks`, { headers: authHeaders }),
-          axios.get(`${process.env.REACT_APP_API_URL}/salary`, { headers: authHeaders }),
-          axios.get(`${process.env.REACT_APP_API_URL}/reimbursements`, { headers: authHeaders }),
-          axios.get(`${process.env.REACT_APP_API_URL}/wfh`, { headers: authHeaders }),
-        ]);
+        const requests = {
+          metrics: hasModuleAccess(profile, 'overview') && axios.get(`${process.env.REACT_APP_API_URL}/dashboard/metrics`, { headers: authHeaders }),
+          employees: hasModuleAccess(profile, 'people') && axios.get(`${process.env.REACT_APP_API_URL}/employees`, { headers: authHeaders }),
+          leaves: hasModuleAccess(profile, 'leave') && axios.get(`${process.env.REACT_APP_API_URL}/leaves`, { headers: authHeaders }),
+          tasks: hasModuleAccess(profile, 'tasks') && axios.get(`${process.env.REACT_APP_API_URL}/tasks`, { headers: authHeaders }),
+          salary: hasModuleAccess(profile, 'salary') && axios.get(`${process.env.REACT_APP_API_URL}/salary`, { headers: authHeaders }),
+          reimbursements: hasModuleAccess(profile, 'reimbursements') && axios.get(`${process.env.REACT_APP_API_URL}/reimbursements`, { headers: authHeaders }),
+          wfh: hasModuleAccess(profile, 'workFromHome') && axios.get(`${process.env.REACT_APP_API_URL}/wfh`, { headers: authHeaders }),
+        };
+        const entries = Object.entries(requests).filter(([, request]) => request);
+        const results = await Promise.allSettled(entries.map(([, request]) => request));
+        const settled = Object.fromEntries(entries.map(([key], index) => [key, results[index]]));
 
-        if (metricsRes.status === 'fulfilled') {
-          setDashboardMetrics(metricsRes.value.data?.data || metricsRes.value.data || {});
+        if (settled.metrics?.status === 'fulfilled') {
+          setDashboardMetrics(settled.metrics.value.data?.data || settled.metrics.value.data || {});
         }
 
-        if (employeesRes.status === 'fulfilled') {
-          setDashboardEmployees(getArrayPayload(employeesRes.value.data));
+        if (settled.employees?.status === 'fulfilled') {
+          setDashboardEmployees(getArrayPayload(settled.employees.value.data));
         }
 
-        if (leavesRes.status === 'fulfilled') {
-          setDashboardLeaves(getArrayPayload(leavesRes.value.data));
+        if (settled.leaves?.status === 'fulfilled') {
+          setDashboardLeaves(getArrayPayload(settled.leaves.value.data));
         }
 
-        if (wfhRes.status === 'fulfilled') {
-          setDashboardWFHRequests(getArrayPayload(wfhRes.value.data));
+        if (settled.wfh?.status === 'fulfilled') {
+          setDashboardWFHRequests(getArrayPayload(settled.wfh.value.data));
         }
 
-        if (tasksRes.status === 'fulfilled') {
-          setDashboardTasks(getArrayPayload(tasksRes.value.data));
+        if (settled.tasks?.status === 'fulfilled') {
+          setDashboardTasks(getArrayPayload(settled.tasks.value.data));
         }
 
-        if (salaryRes.status === 'fulfilled') {
-          setDashboardSalarySlips(getArrayPayload(salaryRes.value.data));
+        if (settled.salary?.status === 'fulfilled') {
+          setDashboardSalarySlips(getArrayPayload(settled.salary.value.data));
         }
 
-        if (reimbursementRes.status === 'fulfilled') {
-          setDashboardReimbursements(getArrayPayload(reimbursementRes.value.data));
+        if (settled.reimbursements?.status === 'fulfilled') {
+          setDashboardReimbursements(getArrayPayload(settled.reimbursements.value.data));
         }
       } catch (err) {
         console.error('Error fetching admin dashboard data:', err);
@@ -643,7 +736,7 @@ const AdminDashboard = () => {
     };
 
     fetchDashboardData();
-  }, []);
+  }, [profile]);
 
   // Fetch notification count
   useEffect(() => {
@@ -2087,17 +2180,19 @@ const AdminDashboard = () => {
                       <span>{profile.employeeId || profile.position || 'Operations lead'}</span>
                     </span>
                   </button>
-                  <button
-                    type="button"
-                    className="admin-topbar-icon-btn"
-                    onClick={() => handleTabClick('settings')}
-                    aria-label="Settings"
-                  >
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.3 4.3a1.7 1.7 0 013.4 0 1.7 1.7 0 002.6 1.1 1.7 1.7 0 012.4 2.4 1.7 1.7 0 001.1 2.6 1.7 1.7 0 010 3.4 1.7 1.7 0 00-1.1 2.6 1.7 1.7 0 01-2.4 2.4 1.7 1.7 0 00-2.6 1.1 1.7 1.7 0 01-3.4 0 1.7 1.7 0 00-2.6-1.1 1.7 1.7 0 01-2.4-2.4 1.7 1.7 0 00-1.1-2.6 1.7 1.7 0 010-3.4 1.7 1.7 0 001.1-2.6 1.7 1.7 0 012.4-2.4 1.7 1.7 0 002.6-1.1z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </button>
+                  {hasTabAccess(profile, 'settings') && (
+                    <button
+                      type="button"
+                      className="admin-topbar-icon-btn"
+                      onClick={() => handleTabClick('settings')}
+                      aria-label="Settings"
+                    >
+                      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.3 4.3a1.7 1.7 0 013.4 0 1.7 1.7 0 002.6 1.1 1.7 1.7 0 012.4 2.4 1.7 1.7 0 001.1 2.6 1.7 1.7 0 010 3.4 1.7 1.7 0 00-1.1 2.6 1.7 1.7 0 01-2.4 2.4 1.7 1.7 0 00-2.6 1.1 1.7 1.7 0 01-3.4 0 1.7 1.7 0 00-2.6-1.1 1.7 1.7 0 01-2.4-2.4 1.7 1.7 0 00-1.1-2.6 1.7 1.7 0 010-3.4 1.7 1.7 0 001.1-2.6 1.7 1.7 0 012.4-2.4 1.7 1.7 0 002.6-1.1z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="admin-topbar-icon-btn"
@@ -2216,16 +2311,15 @@ const AdminDashboard = () => {
                     </div>
                   </div>
                   <div className="admin-hero-actions">
-                    <button type="button" className="admin-action-btn" onClick={() => handleTabClick('add-employee')}>Add Employee</button>
-                    <button type="button" className="admin-action-btn" onClick={() => handleTabClick('attendance-approvals')}>Approve Attendance</button>
-                    <button type="button" className="admin-action-btn" onClick={() => handleTabClick('tracking')}>Live Tracking</button>
-                    <button type="button" className="admin-action-btn" onClick={() => handleTabClick('leaves')}>Review Leaves</button>
-                    <button type="button" className="admin-action-btn" onClick={() => handleTabClick('wfh')}>Review WFH</button>
-                    <button type="button" className="admin-action-btn" onClick={() => handleTabClick('tasks')}>Assign Tasks</button>
+                    {['add-employee', 'attendance-approvals', 'tracking', 'leaves', 'wfh', 'tasks'].filter((tab) => hasTabAccess(profile, tab)).map((tab) => (
+                      <button key={tab} type="button" className="admin-action-btn" onClick={() => handleTabClick(tab)}>
+                        {TAB_LABELS[tab] || tab}
+                      </button>
+                    ))}
                   </div>
                 </section>
 
-                <DashboardLiveOps onNavigate={handleTabClick} />
+                {hasModuleAccess(profile, 'attendance') && <DashboardLiveOps onNavigate={handleTabClick} />}
 
                 <section className="admin-kpi-grid">
                   <div className="admin-kpi-card" style={{ '--accent': '#bfdbfe' }}>
