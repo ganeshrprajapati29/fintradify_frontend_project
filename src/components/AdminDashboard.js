@@ -412,11 +412,17 @@ const RolePermissions = () => {
   }, []);
 
   const selectedEmployee = employees.find((employee) => employee._id === selectedId);
+  const updateEmployeeInState = (updatedEmployee) => {
+    if (!updatedEmployee?._id) return;
+    setEmployees((current) => current.map((employee) => (
+      employee._id === updatedEmployee._id ? { ...employee, ...updatedEmployee } : employee
+    )));
+  };
 
   const selectEmployee = (id) => {
     const employee = employees.find((item) => item._id === id);
     setSelectedId(id);
-    setRole(employee?.role || 'employee');
+    setRole(String(employee?.role || 'employee').toLowerCase());
     setAccess({ ...(employee?.access || {}) });
     setReason('');
     setMessage('');
@@ -432,17 +438,23 @@ const RolePermissions = () => {
       setError('Please select an employee first');
       return;
     }
+    const nextRole = String(role || 'employee').trim().toLowerCase();
+    if (!['admin', 'hr', 'manager', 'employee'].includes(nextRole)) {
+      setError('Please select a valid role');
+      return;
+    }
     setSaving(true);
     setError('');
     setMessage('');
     try {
       const res = await axios.put(
         `${process.env.REACT_APP_API_URL}/employees/${selectedEmployee._id}/role-permissions`,
-        { role, access, reason },
+        { role: nextRole, access, reason },
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
+      updateEmployeeInState(res.data?.data);
       setMessage(res.data?.message || 'Permissions updated successfully');
-      await fetchEmployees();
+      fetchEmployees();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update permissions');
     } finally {
@@ -461,13 +473,14 @@ const RolePermissions = () => {
         { role: 'employee', access: employee.access || {}, reason: 'Admin panel role removed' },
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
+      updateEmployeeInState(res.data?.data);
       setMessage(res.data?.message || 'Staff access removed');
       if (selectedId === employee._id) {
         setSelectedId('');
         setRole('employee');
         setAccess({});
       }
-      await fetchEmployees();
+      fetchEmployees();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to remove staff access');
     } finally {
@@ -475,7 +488,7 @@ const RolePermissions = () => {
     }
   };
 
-  const assignedStaff = employees.filter((employee) => ['admin', 'hr', 'manager'].includes(employee.role));
+  const assignedStaff = employees.filter((employee) => ['admin', 'hr', 'manager'].includes(String(employee.role || '').toLowerCase()));
 
   return (
     <div className="admin-directory">
@@ -566,7 +579,7 @@ const RolePermissions = () => {
                       <strong>{employee.name}</strong>
                       <span className="d-block text-muted small">{employee.email}</span>
                     </td>
-                    <td><span className="admin-status active">{employee.role}</span></td>
+                    <td><span className="admin-status active">{String(employee.role || 'employee').toUpperCase()}</span></td>
                     <td>
                       {ACCESS_MODULES
                         .filter((module) => employee.role === 'admin' || employee.access?.[module.key] !== false)
@@ -577,7 +590,7 @@ const RolePermissions = () => {
                       <Button size="sm" variant="outline-primary" className="me-2" onClick={() => selectEmployee(employee._id)}>
                         Edit
                       </Button>
-                      {employee.role !== 'admin' && (
+                      {String(employee.role || '').toLowerCase() !== 'admin' && (
                         <Button size="sm" variant="outline-danger" onClick={() => removeStaffAccess(employee)} disabled={saving}>
                           Remove
                         </Button>
