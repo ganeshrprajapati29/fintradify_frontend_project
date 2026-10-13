@@ -149,6 +149,16 @@ const ACCESS_MODULES = [
   { key: 'settings', label: 'System Settings', tabs: ['settings', 'login-credentials'] },
 ];
 
+const ADMIN_ONLY_TABS = ['role-permissions', 'login-credentials'];
+const ADMIN_PERMISSION_ITEMS = ADMIN_NAV_GROUPS.flatMap((group) => (
+  group.items.map((tab) => ({
+    tab,
+    group: group.title,
+    label: TAB_LABELS[tab] || tab,
+    adminOnly: ADMIN_ONLY_TABS.includes(tab),
+  }))
+));
+
 const tabToAccessKey = ADMIN_TABS.reduce((acc, tab) => {
   const module = ACCESS_MODULES.find((item) => item.tabs.includes(tab));
   acc[tab] = module?.key || 'overview';
@@ -159,6 +169,9 @@ const hasTabAccess = (profile, tab) => {
   const role = profile.role || 'admin';
   if (role === 'admin') return true;
   if (['role-permissions', 'login-credentials'].includes(tab)) return false;
+  if (profile.adminTabs && Object.prototype.hasOwnProperty.call(profile.adminTabs, tab)) {
+    return profile.adminTabs[tab] !== false;
+  }
   const accessKey = tabToAccessKey[tab];
   if (!accessKey) return true;
   return profile.access?.[accessKey] !== false;
@@ -390,6 +403,7 @@ const RolePermissions = () => {
   const [selectedId, setSelectedId] = useState('');
   const [role, setRole] = useState('employee');
   const [access, setAccess] = useState({});
+  const [adminTabs, setAdminTabs] = useState({});
   const [reason, setReason] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -422,8 +436,14 @@ const RolePermissions = () => {
   const selectEmployee = (id) => {
     const employee = employees.find((item) => item._id === id);
     setSelectedId(id);
-    setRole(String(employee?.role || 'employee').toLowerCase());
+    const nextRole = String(employee?.role || 'employee').toLowerCase();
+    const existingTabs = employee?.adminTabs || {};
+    setRole(nextRole);
     setAccess({ ...(employee?.access || {}) });
+    setAdminTabs(ADMIN_PERMISSION_ITEMS.reduce((acc, item) => {
+      acc[item.tab] = nextRole === 'admin' || (!item.adminOnly && existingTabs[item.tab] !== false);
+      return acc;
+    }, {}));
     setReason('');
     setMessage('');
     setError('');
@@ -431,6 +451,18 @@ const RolePermissions = () => {
 
   const toggleAccess = (key) => {
     setAccess((current) => ({ ...current, [key]: !(current[key] !== false) }));
+  };
+
+  const toggleAdminTab = (tab) => {
+    if (ADMIN_ONLY_TABS.includes(tab)) return;
+    setAdminTabs((current) => ({ ...current, [tab]: !(current[tab] !== false) }));
+  };
+
+  const setRoleSelection = (nextRole) => {
+    setRole(nextRole);
+    if (nextRole === 'admin') {
+      setAdminTabs(ADMIN_PERMISSION_ITEMS.reduce((acc, item) => ({ ...acc, [item.tab]: true }), {}));
+    }
   };
 
   const savePermissions = async () => {
@@ -449,7 +481,7 @@ const RolePermissions = () => {
     try {
       const res = await axios.put(
         `${process.env.REACT_APP_API_URL}/employees/${selectedEmployee._id}/role-permissions`,
-        { role: nextRole, access, reason },
+        { role: nextRole, access, adminTabs, reason },
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
       updateEmployeeInState(res.data?.data);
@@ -470,7 +502,7 @@ const RolePermissions = () => {
     try {
       const res = await axios.put(
         `${process.env.REACT_APP_API_URL}/employees/${employee._id}/role-permissions`,
-        { role: 'employee', access: employee.access || {}, reason: 'Admin panel role removed' },
+        { role: 'employee', access: employee.access || {}, adminTabs: employee.adminTabs || {}, reason: 'Admin panel role removed' },
         { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
       );
       updateEmployeeInState(res.data?.data);
@@ -479,6 +511,7 @@ const RolePermissions = () => {
         setSelectedId('');
         setRole('employee');
         setAccess({});
+        setAdminTabs({});
       }
       fetchEmployees();
     } catch (err) {
@@ -521,7 +554,7 @@ const RolePermissions = () => {
           <>
             <Form.Group className="mb-3">
               <Form.Label>Role</Form.Label>
-              <Form.Select value={role} onChange={(event) => setRole(event.target.value)}>
+              <Form.Select value={role} onChange={(event) => setRoleSelection(event.target.value)}>
                 <option value="employee">Employee</option>
                 <option value="hr">HR</option>
                 <option value="manager">Manager</option>
@@ -539,23 +572,46 @@ const RolePermissions = () => {
                     type="button"
                     size="sm"
                     variant={role === value ? 'primary' : 'outline-primary'}
-                    onClick={() => setRole(value)}
+                    onClick={() => setRoleSelection(value)}
                   >
                     {label}
                   </Button>
                 ))}
               </div>
             </Form.Group>
-            <div className="row g-3">
-              {ACCESS_MODULES.map((module) => (
-                <div className="col-md-6 col-xl-4" key={module.key}>
+            <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+              <Form.Label className="mb-0">Sidebar Options Permission</Form.Label>
+              {role !== 'admin' && (
+                <div className="d-flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline-primary"
+                    onClick={() => setAdminTabs(ADMIN_PERMISSION_ITEMS.reduce((acc, item) => ({ ...acc, [item.tab]: !item.adminOnly }), {}))}
+                  >
+                    Select All
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline-secondary"
+                    onClick={() => setAdminTabs(ADMIN_PERMISSION_ITEMS.reduce((acc, item) => ({ ...acc, [item.tab]: false }), {}))}
+                  >
+                    Clear
+                  </Button>
+                </div>
+              )}
+            </div>
+            <div className="row g-2">
+              {ADMIN_PERMISSION_ITEMS.map((item) => (
+                <div className="col-md-6 col-xl-4" key={item.tab}>
                   <Form.Check
                     type="switch"
-                    id={`access-${module.key}`}
-                    label={module.label}
-                    checked={role === 'admin' || access[module.key] !== false}
-                    disabled={role === 'admin'}
-                    onChange={() => toggleAccess(module.key)}
+                    id={`admin-tab-${item.tab}`}
+                    label={`${item.label}${item.adminOnly ? ' (Admin only)' : ''}`}
+                    checked={role === 'admin' || (!item.adminOnly && adminTabs[item.tab] !== false)}
+                    disabled={role === 'admin' || item.adminOnly}
+                    onChange={() => toggleAdminTab(item.tab)}
                   />
                 </div>
               ))}
@@ -599,9 +655,9 @@ const RolePermissions = () => {
                     </td>
                     <td><span className="admin-status active">{String(employee.role || 'employee').toUpperCase()}</span></td>
                     <td>
-                      {ACCESS_MODULES
-                        .filter((module) => employee.role === 'admin' || employee.access?.[module.key] !== false)
-                        .map((module) => module.label)
+                      {ADMIN_PERMISSION_ITEMS
+                        .filter((item) => String(employee.role || '').toLowerCase() === 'admin' || (!item.adminOnly && employee.adminTabs?.[item.tab] !== false))
+                        .map((item) => item.label)
                         .join(', ') || 'No modules'}
                     </td>
                     <td>
