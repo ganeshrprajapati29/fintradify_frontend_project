@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Badge, Button, Col, Form, Modal, Pagination, Row, Spinner, Table } from 'react-bootstrap';
 import moment from 'moment';
 import api from '../utils/axios';
@@ -57,6 +57,9 @@ const AttendanceTable = ({ isEmployee }) => {
   const [success, setSuccess] = useState('');
   const [punchStatus, setPunchStatus] = useState({ canPunchIn: true, canPunchOut: false, shiftLabel: '' });
   const [punchModePopup, setPunchModePopup] = useState(null);
+  // A punch request is on its way: both buttons stay disabled until it finishes.
+  const [punching, setPunching] = useState(false);
+  const punchingRef = useRef(false);
 
   const endpoint = isEmployee ? '/attendance/my-attendance' : '/attendance';
 
@@ -180,26 +183,33 @@ const AttendanceTable = ({ isEmployee }) => {
       (geoError) => reject(new Error(geoError.code === 1
         ? 'Location permission is required to punch in or out. Please allow location access in your browser.'
         : 'Could not get your location. Please turn on GPS/location and try again.')),
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
     );
   });
 
   const handlePunch = async (type) => {
+    if (punchingRef.current) return;
+    punchingRef.current = true;
+    setPunching(true);
     try {
-      let coords;
+      // Location off or blocked: the punch is still recorded, without a location.
+      // The browser shows its "Allow location" prompt here the first time.
+      let coords = null;
+      let locationHint = '';
       try {
         coords = await getBrowserLocation();
       } catch (geoError) {
-        setSuccess('');
-        setError(geoError.message);
-        return;
+        coords = null;
+        locationHint = ' To share your location next time, allow location for this site from the lock icon in the address bar and turn on GPS/location.';
       }
-      const response = await api.post('/attendance/punch', {
-        type,
-        location: { lat: coords.latitude, lng: coords.longitude, accuracy: coords.accuracy },
-        address: `${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`,
-      });
-      setSuccess(response.data.message || `Punch ${type} recorded successfully`);
+      const response = await api.post('/attendance/punch', coords
+        ? {
+          type,
+          location: { lat: coords.latitude, lng: coords.longitude, accuracy: coords.accuracy },
+          address: `${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`,
+        }
+        : { type });
+      setSuccess(`${response.data.message || `Punch ${type} recorded successfully`}${locationHint}`);
       setError('');
       if (type === 'in' && response.data.popupMessage) {
         setPunchModePopup({
@@ -212,6 +222,11 @@ const AttendanceTable = ({ isEmployee }) => {
     } catch (err) {
       setSuccess('');
       setError(err.response?.data?.message || 'Error recording punch');
+      // The buttons follow the server again (e.g. already punched in from the app).
+      fetchPunchStatus().catch(() => {});
+    } finally {
+      punchingRef.current = false;
+      setPunching(false);
     }
   };
 
@@ -605,7 +620,7 @@ const AttendanceTable = ({ isEmployee }) => {
             <div className="attendance-punch-status">
               <div>
                 <p className="attendance-eyebrow">Today status</p>
-                <strong>{punchStatus.nextIsExtra ? 'Shift completed · you can start an extra shift' : punchStatus.canPunchIn ? 'Ready to punch in' : punchStatus.canPunchOut ? 'Working session active' : 'Punch completed'}</strong>
+                <strong>{punchStatus.nextIsExtra ? 'Shift completed · you can start an extra shift' : punchStatus.canPunchIn ? 'Ready to punch in' : punchStatus.canPunchOut ? 'Working session active · punch out before your next punch in' : 'Punch completed'}</strong>
                 {punchStatus.shiftLabel && (
                   <div className="small text-muted mt-1">
                     Shift: {punchStatus.shiftLabel}{punchStatus.isLate ? ` · late by ${punchStatus.lateMinutes} min` : ''}
@@ -617,10 +632,10 @@ const AttendanceTable = ({ isEmployee }) => {
               </Badge>
             </div>
             <div className="attendance-punch-actions">
-              <Button className="attendance-button" variant="success" onClick={() => handlePunch('in')} disabled={!punchStatus.canPunchIn || loading}>
+              <Button className="attendance-button" variant="success" onClick={() => handlePunch('in')} disabled={!punchStatus.canPunchIn || punchStatus.canPunchOut || loading || punching}>
                 {punchStatus.nextIsExtra ? 'Start Extra Shift' : 'Punch In'}
               </Button>
-              <Button className="attendance-button" variant="danger" onClick={() => handlePunch('out')} disabled={!punchStatus.canPunchOut || loading}>
+              <Button className="attendance-button" variant="danger" onClick={() => handlePunch('out')} disabled={!punchStatus.canPunchOut || loading || punching}>
                 Punch Out
               </Button>
             </div>
