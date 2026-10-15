@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Circle, CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, Tooltip, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { handOff, useLiveStream } from './monitoringShared';
 import TrackingRadar, {
   MAX_RADAR_KM,
   RADAR_PRESETS,
@@ -248,7 +249,11 @@ const buildTimeline = (points, events) => {
 /* ------------------------------------------------------------------ */
 /* Map pieces                                                          */
 /* ------------------------------------------------------------------ */
-const markerIcon = (employee, info, selected) => {
+const markerIcon = (employee, info, selected, isOnline) => {
+  const heading = Number(employee.currentLocation?.heading);
+  const arrow = info.moving && Number.isFinite(heading) && heading >= 0
+    ? `<b class="lt-heading" style="transform: rotate(${Math.round(heading)}deg)"></b>`
+    : '';
   const photo = employee.profilePhoto
     ? `<img src="${escapeHtml(employee.profilePhoto)}" alt="" />`
     : `<span>${escapeHtml(initials(employee.name))}</span>`;
@@ -260,10 +265,52 @@ const markerIcon = (employee, info, selected) => {
     html: `
       <div class="lt-marker ${selected ? 'is-selected' : ''} ${info.live ? '' : 'is-stale'}" style="--c:${info.color}">
         ${info.live ? '<i class="lt-marker-pulse"></i>' : ''}
+        ${arrow}
         <div class="lt-marker-face">${photo}</div>
+        ${isOnline ? '<i class="lt-online" title="App open"></i>' : ''}
         <b class="lt-marker-tip"></b>
       </div>`,
   });
+};
+
+/**
+ * Marker that glides from its last position to the new one instead of jumping
+ * (like ride-hailing apps). Leaflet's marker is moved directly every animation
+ * frame, so the React tree is not re-rendered while it moves.
+ */
+const SmoothMarker = ({ position, children, ...props }) => {
+  const markerRef = useRef(null);
+  const initial = useRef(position);
+  const shown = useRef(position);
+  const [lat, lng] = position;
+  useEffect(() => {
+    const marker = markerRef.current;
+    if (!marker) return undefined;
+    const from = shown.current;
+    const to = [lat, lng];
+    if (!from || (from[0] === to[0] && from[1] === to[1])) return undefined;
+    const distance = metersBetween(from, to);
+    // Far jumps (first fix, bad GPS) are not animated.
+    if (distance > 3000) {
+      marker.setLatLng(to);
+      shown.current = to;
+      return undefined;
+    }
+    const duration = Math.min(3500, Math.max(700, distance * 35));
+    const start = performance.now();
+    let frame = null;
+    const step = (time) => {
+      const k = Math.min(1, (time - start) / duration);
+      const eased = k < 0.5 ? 2 * k * k : -1 + (4 - 2 * k) * k;
+      const point = [from[0] + (to[0] - from[0]) * eased, from[1] + (to[1] - from[1]) * eased];
+      marker.setLatLng(point);
+      shown.current = point;
+      if (k < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => { if (frame) cancelAnimationFrame(frame); };
+  }, [lat, lng]);
+  return <Marker ref={markerRef} position={initial.current} {...props}>{children}</Marker>;
 };
 
 const officeIcon = L.divIcon({
@@ -388,6 +435,7 @@ const EmployeeTracking = () => {
   const [liveConnected, setLiveConnected] = useState(false);
   const [lastEvent, setLastEvent] = useState(null);
   const [now, setNow] = useState(Date.now());
+  const [online, setOnline] = useState({});
 
   const [selectedId, setSelectedId] = useState(null);
   const [follow, setFollow] = useState(true);
@@ -463,6 +511,7 @@ const EmployeeTracking = () => {
         accuracy: data.accuracy,
         speed: data.speed,
         heading: data.heading,
+        isMocked: data.isMocked,
         address: data.address || employee.currentLocation?.address || '',
         timestamp: stamp,
         batteryLevel: data.batteryLevel ?? employee.currentLocation?.batteryLevel,
@@ -511,41 +560,6 @@ const EmployeeTracking = () => {
     const trailPoll = setInterval(fetchTrails, 120000);
     const clock = setInterval(() => setNow(Date.now()), 10000);
 
-    // Live stream: a one-time ticket is exchanged first, then the stream reconnects on its own.
-    let source = null;
-    let retryTimer = null;
-    let closed = false;
-    const connect = async () => {
-      if (closed || typeof window.EventSource === 'undefined') return;
-      try {
-        const res = await axios.post(`${API}/tracking/stream-ticket`, {}, { headers: authHeaders() });
-        if (closed) return;
-        source = new window.EventSource(`${API}/tracking/stream?ticket=${res.data.ticket}`);
-        source.addEventListener('ready', () => setLiveConnected(true));
-        source.addEventListener('location', (event) => {
-          try { applyLivePoint(JSON.parse(event.data)); } catch (parseError) { /* ignore malformed frame */ }
-        });
-        source.addEventListener('attendance', () => fetchTracking(true));
-        source.addEventListener('status', (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            setEmployees((prev) => prev.map((employee) => (employee._id === data.employeeId ? { ...employee, trackingStatus: data } : employee)));
-            setLastEvent(new Date());
-          } catch (parseError) { /* ignore malformed frame */ }
-        });
-        source.onerror = () => {
-          setLiveConnected(false);
-          if (source) source.close();
-          source = null;
-          if (!closed) retryTimer = setTimeout(connect, 5000);
-        };
-      } catch (streamError) {
-        setLiveConnected(false);
-        if (!closed) retryTimer = setTimeout(connect, 10000);
-      }
-    };
-    connect();
-
     const onAttendance = () => fetchTracking(true);
     window.addEventListener('attendanceUpdated', onAttendance);
     return () => {
@@ -553,11 +567,33 @@ const EmployeeTracking = () => {
       clearInterval(poll);
       clearInterval(trailPoll);
       clearInterval(clock);
-      if (retryTimer) clearTimeout(retryTimer);
-      if (source) source.close();
       window.removeEventListener('attendanceUpdated', onAttendance);
     };
   }, []);
+
+  // Live events over Socket.IO: positions glide on the map as they arrive.
+  useLiveStream({
+    location: applyLivePoint,
+    attendance: () => fetchTracking(true),
+    status: (data) => {
+      setEmployees((prev) => prev.map((employee) => (employee._id === data.employeeId
+        ? { ...employee, trackingStatus: { ...(employee.trackingStatus || {}), ...data } }
+        : employee)));
+      setLastEvent(new Date());
+    },
+    presence: (data) => setOnline((prev) => ({ ...prev, [data.employeeId]: { app: Boolean(data.app), web: Boolean(data.web) } })),
+    presenceSnapshot: (snapshot) => setOnline(snapshot || {}),
+  }, setLiveConnected);
+
+  // Opened from the admin search ("Track on map"): select that employee once data is in.
+  useEffect(() => {
+    if (!employees.length) return;
+    const wanted = handOff.take('track-employee');
+    if (wanted && employees.some((e) => String(e._id) === String(wanted))) {
+      setFilter('all');
+      selectEmployee(String(wanted));
+    }
+  }, [employees.length > 0]);
 
   /* ---------------- derived ---------------- */
   const rows = useMemo(() => employees.map((employee) => ({
@@ -805,6 +841,9 @@ const EmployeeTracking = () => {
         .lt-marker.is-stale .lt-marker-face { border-style: dashed; }
         .lt-marker.is-selected .lt-marker-face { border-color: #facc15; border-style: solid; box-shadow: 0 0 0 3px rgba(250,204,21,.5), 0 4px 12px rgba(15,23,42,.35); }
         .lt-marker-face img { width: 100%; height: 100%; object-fit: cover; }
+        .lt-heading { position: absolute; left: 15px; top: -14px; width: 16px; height: 16px; transform-origin: 8px 34px; z-index: 2; }
+        .lt-heading::before { content: ''; position: absolute; left: 3px; top: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 10px solid var(--c); filter: drop-shadow(0 1px 1px rgba(0,0,0,.35)); }
+        .lt-online { position: absolute; right: 1px; top: 28px; width: 12px; height: 12px; border-radius: 50%; background: #22c55e; border: 2px solid #fff; z-index: 3; }
         .lt-marker-tip { position: absolute; left: 17px; top: 37px; width: 12px; height: 12px; background: var(--c); transform: rotate(45deg); border-right: 3px solid #fff; border-bottom: 3px solid #fff; }
         .lt-marker-pulse { position: absolute; left: 3px; top: 0; width: 40px; height: 40px; border-radius: 50%; background: var(--c); opacity: .45; animation: lt-ring 1.8s ease-out infinite; }
         @keyframes lt-ring { 0% { transform: scale(1); opacity: .45; } 100% { transform: scale(2.3); opacity: 0; } }
@@ -1043,10 +1082,10 @@ const EmployeeTracking = () => {
                     ))}
 
                     {located.map(({ employee, info }) => (
-                      <Marker
+                      <SmoothMarker
                         key={employee._id}
                         position={info.position}
-                        icon={markerIcon(employee, info, employee._id === selectedId)}
+                        icon={markerIcon(employee, info, employee._id === selectedId, online[employee._id]?.app)}
                         zIndexOffset={employee._id === selectedId ? 1000 : info.live ? 500 : 0}
                         eventHandlers={{ click: () => selectEmployee(employee._id) }}
                       >
@@ -1063,12 +1102,17 @@ const EmployeeTracking = () => {
                               {employee.currentLocation?.address && <div><b>Near:</b> {employee.currentLocation.address}</div>}
                               <div><b>Location:</b> {info.signal}{isNum(employee.currentLocation?.accuracy) ? ` · ±${Math.round(employee.currentLocation.accuracy)} m` : ''}</div>
                             </div>
+                            {(online[employee._id]?.app || online[employee._id]?.web) && (
+                              <div style={{ fontSize: 12, color: '#15803d', fontWeight: 700, marginTop: 4 }}>
+                                ● {[online[employee._id]?.app && 'App open now', online[employee._id]?.web && 'Website open now'].filter(Boolean).join(' · ')}
+                              </div>
+                            )}
                             <div className="d-flex gap-2 mt-2">
                               <a className="lt-btn" href={googleMapsUrl(info.position[0], info.position[1])} target="_blank" rel="noopener noreferrer">Google Maps</a>
                             </div>
                           </div>
                         </Popup>
-                      </Marker>
+                      </SmoothMarker>
                     ))}
                   </MapContainer>
                 )}

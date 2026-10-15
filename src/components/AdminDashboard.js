@@ -35,6 +35,9 @@ import EmployeeTracking from './EmployeeTracking';
 import EmployeeLocationTracker from './EmployeeLocationTracker';
 import AttendanceApprovals from './AttendanceApprovals';
 import AdminOverview from './AdminOverview';
+import AdminSearch from './AdminSearch';
+import { PageLoader, TopLoader } from './AdminLoaders';
+import { closeSocket } from '../utils/realtime';
 import EmployeeMonitor from './EmployeeMonitor';
 import EmployeeActivity from './EmployeeActivity';
 import ActivityAlerts from './ActivityAlerts';
@@ -702,6 +705,7 @@ const AdminDashboard = () => {
   const [error, setError] = useState('');
   const [profile, setProfile] = useState({});
   const [notificationCount, setNotificationCount] = useState(0);
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const history = useHistory();
   const authHeaders = { Authorization: `Bearer ${localStorage.getItem('token')}` };
 
@@ -713,6 +717,8 @@ const AdminDashboard = () => {
         setProfile(res.data?.data || res.data || {});
       } catch (err) {
         console.error('Error fetching profile:', err);
+      } finally {
+        setProfileLoaded(true);
       }
     };
     fetchProfile();
@@ -749,6 +755,7 @@ const AdminDashboard = () => {
   const visibleTabs = ADMIN_TABS.filter((tab) => hasTabAccess(profile, tab));
 
   const handleLogout = () => {
+    closeSocket();
     localStorage.removeItem('token');
     history.push('/');
   };
@@ -2028,6 +2035,8 @@ const AdminDashboard = () => {
         {/* Main Content */}
         <div className="content-area">
           <Navbar bg="light" variant="light" className="admin-topbar mb-5">
+            <TopLoader />
+            {!profileLoaded && <PageLoader />}
             <Container fluid className="px-0">
               <div className="admin-topbar-inner">
               <Button
@@ -2045,6 +2054,7 @@ const AdminDashboard = () => {
                   <strong>{activeNavLabel}</strong>
                 </div>
                 <div className="admin-topbar-actions">
+                  <AdminSearch onNavigate={handleTabClick} canOpen={(tab) => hasTabAccess(profile, tab)} />
                   <div className="admin-time-chip d-none d-md-inline-flex">
                     <svg className="admin-topbar-action-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />

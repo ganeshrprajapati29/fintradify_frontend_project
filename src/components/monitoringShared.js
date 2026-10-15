@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import api from '../utils/axios';
+import { getSocket } from '../utils/realtime';
 
 /* Shared look and helpers for the monitoring pages
    (Employee Monitor, Activity Tracking, Activity Alerts). */
@@ -111,10 +111,12 @@ export const handOff = {
   },
 };
 
+const LIVE_EVENTS = ['activity', 'attendance', 'status', 'location', 'presence', 'device'];
+
 /**
- * Subscribes to the live server stream (same one the live map uses).
- * handlers: { activity, attendance, status, location } -> fn(data). Returns nothing;
- * reconnects on its own and stops when the component unmounts.
+ * Subscribes to live server events over Socket.IO (shared connection).
+ * handlers: { activity, attendance, status, location, presence, device } -> fn(data).
+ * onConnection(bool) reports the connection state. Cleans up on unmount.
  */
 export const useLiveStream = (handlers, onConnection) => {
   const ref = useRef(handlers);
@@ -122,40 +124,33 @@ export const useLiveStream = (handlers, onConnection) => {
   const connRef = useRef(onConnection);
   connRef.current = onConnection;
   useEffect(() => {
-    let source = null;
-    let timer = null;
-    let closed = false;
-    const connect = async () => {
-      if (closed || typeof window.EventSource === 'undefined') return;
-      try {
-        const res = await api.post('/tracking/stream-ticket', {});
-        if (closed) return;
-        const base = api.defaults.baseURL.replace(/\/+$/, '');
-        source = new window.EventSource(`${base}/tracking/stream?ticket=${res.data.ticket}`);
-        source.addEventListener('ready', () => connRef.current && connRef.current(true));
-        ['activity', 'attendance', 'status', 'location'].forEach((name) => {
-          source.addEventListener(name, (event) => {
-            const fn = ref.current && ref.current[name];
-            if (!fn) return;
-            try { fn(JSON.parse(event.data)); } catch (e) { /* ignore malformed frame */ }
-          });
-        });
-        source.onerror = () => {
-          if (connRef.current) connRef.current(false);
-          if (source) source.close();
-          source = null;
-          if (!closed) timer = setTimeout(connect, 5000);
-        };
-      } catch (error) {
-        if (connRef.current) connRef.current(false);
-        if (!closed) timer = setTimeout(connect, 10000);
-      }
+    const socket = getSocket('staff');
+    if (!socket) return undefined;
+    const listeners = LIVE_EVENTS.map((name) => {
+      const fn = (data) => {
+        const handler = ref.current && ref.current[name];
+        if (handler) handler(data);
+      };
+      socket.on(name, fn);
+      return [name, fn];
+    });
+    const up = () => connRef.current && connRef.current(true);
+    const down = () => connRef.current && connRef.current(false);
+    const ready = (data) => {
+      up();
+      if (data?.presence && ref.current?.presenceSnapshot) ref.current.presenceSnapshot(data.presence);
     };
-    connect();
+    socket.on('connect', up);
+    socket.on('disconnect', down);
+    socket.on('connect_error', down);
+    socket.on('ready', ready);
+    if (socket.connected) up();
     return () => {
-      closed = true;
-      if (timer) clearTimeout(timer);
-      if (source) source.close();
+      listeners.forEach(([name, fn]) => socket.off(name, fn));
+      socket.off('connect', up);
+      socket.off('disconnect', down);
+      socket.off('connect_error', down);
+      socket.off('ready', ready);
     };
   }, []);
 };

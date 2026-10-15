@@ -31,6 +31,7 @@ const FILTERS = {
   signal_lost: { label: 'Phone silent', test: (r) => r.location.status === 'signal_lost' },
   no_app: { label: 'Logged out / no app', test: (r) => ['logged_out', 'no_app'].includes(r.location.status) },
   web: { label: 'Punched via website', test: (r) => r.punch.inClient === 'web' || r.punch.outClient === 'web' },
+  app_open: { label: 'App open now', test: (r) => r.online?.app },
   issues: {
     label: 'Needs attention',
     test: (r) => ['gps_off', 'permission_off', 'signal_lost'].includes(r.location.status)
@@ -69,12 +70,13 @@ const EmployeeMonitor = ({ onOpenActivity }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [filter, setFilter] = useState(() => handOff.take('monitor-filter') || 'all');
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(() => handOff.take('monitor-search') || '');
   const [department, setDepartment] = useState('');
   const [sort, setSort] = useState('attention');
   const [connected, setConnected] = useState(false);
   const [updatedAt, setUpdatedAt] = useState(null);
   const [now, setNow] = useState(Date.now());
+  const [deviceOf, setDeviceOf] = useState(null);
   const refreshTimer = useRef(null);
 
   const load = useCallback(async () => {
@@ -125,6 +127,9 @@ const EmployeeMonitor = ({ onOpenActivity }) => {
     },
     attendance: scheduleRefresh,
     status: scheduleRefresh,
+    presence: (data) => setRows((prev) => prev.map((row) => (String(row._id) === data.employeeId ? { ...row, online: { app: Boolean(data.app), web: Boolean(data.web) } } : row))),
+    presenceSnapshot: (snapshot) => setRows((prev) => prev.map((row) => ({ ...row, online: snapshot[String(row._id)] || { app: false, web: false } }))),
+    device: (data) => setRows((prev) => prev.map((row) => (String(row._id) === data.employeeId ? { ...row, device: { ...(row.device || {}), [data.client === 'web' ? 'web' : 'app']: data.details } } : row))),
     location: (point) => {
       // Moves the "last location" without a full reload.
       setRows((prev) => prev.map((row) => {
@@ -207,6 +212,7 @@ const EmployeeMonitor = ({ onOpenActivity }) => {
     ['signal_lost', 'Phone silent', summary.signalLost, '#ea580c', 'no location coming'],
     ['no_app', 'Logged out / no app', (summary.loggedOut || 0) + (summary.noApp || 0), '#64748b', 'not tracking'],
     ['web', 'Via website', counts.web, '#0e7490', 'punched on website'],
+    ['app_open', 'App open now', counts.app_open, '#15803d', 'connected live'],
   ];
 
   return (
@@ -295,6 +301,10 @@ const EmployeeMonitor = ({ onOpenActivity }) => {
                             <div className="mn-strong">{row.name}</div>
                             <div className="mn-muted">{row.employeeId}{row.department ? ` · ${row.department}` : ''}</div>
                             {row.shift && <div className="mn-muted">{row.shift.name} {row.shift.startTime}–{row.shift.endTime}</div>}
+                            <div className="d-flex gap-1 mt-1">
+                              {row.online?.app && <span className="mn-src" style={{ '--c': '#15803d', '--s': '#dcfce7', marginLeft: 0 }}>● App open</span>}
+                              {row.online?.web && <span className="mn-src" style={{ '--c': '#0e7490', '--s': '#cffafe', marginLeft: 0 }}>● Website open</span>}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -347,6 +357,7 @@ const EmployeeMonitor = ({ onOpenActivity }) => {
                       <td style={{ whiteSpace: 'nowrap' }}>
                         <div className="d-grid gap-1">
                           <button type="button" className="mn-btn sm primary" onClick={() => openActivity(row._id)}>Activity</button>
+                          <button type="button" className="mn-btn sm" onClick={() => setDeviceOf(row)}>Device</button>
                           {latest && <a className="mn-btn sm" href={mapsUrl(latest.latitude, latest.longitude)} target="_blank" rel="noopener noreferrer">Map</a>}
                         </div>
                       </td>
@@ -385,8 +396,90 @@ const EmployeeMonitor = ({ onOpenActivity }) => {
           </div>
         </div>
       </section>
+
+      {deviceOf && (
+        <DevicePanel
+          row={rows.find((r) => String(r._id) === String(deviceOf._id)) || deviceOf}
+          now={now}
+          onClose={() => setDeviceOf(null)}
+        />
+      )}
+    </div>
+  );
+};
+
+const DEVICE_LABELS = [
+  ['manufacturer', 'Manufacturer'], ['brand', 'Brand'], ['model', 'Model'], ['os', 'OS'], ['osVersion', 'OS version'], ['sdk', 'Android SDK'],
+  ['appVersion', 'App version'], ['batteryLevel', 'Battery'], ['charging', 'Charging'], ['network', 'Network'], ['carrier', 'Mobile operator'],
+  ['locationEnabled', 'Location (GPS)'], ['backgroundPermission', 'Location "all the time"'], ['batteryOptimized', 'Battery optimisation'],
+  ['powerSave', 'Battery saver'], ['intervalSeconds', 'Report interval'], ['browser', 'Browser'], ['platform', 'Platform'],
+  ['screen', 'Screen'], ['locale', 'Language'], ['timezone', 'Time zone'],
+];
+const deviceValue = (key, value) => {
+  if (value === undefined || value === null || value === '') return null;
+  if (key === 'batteryLevel') return `${value}%`;
+  if (key === 'intervalSeconds') return `${value} s`;
+  if (key === 'locationEnabled') return value ? 'On' : 'Off';
+  if (key === 'backgroundPermission') return value ? 'Allowed' : 'Not allowed';
+  if (key === 'batteryOptimized') return value ? 'On (may stop tracking)' : 'Off (good)';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  return String(value);
+};
+// Values that put tracking at risk are shown in red.
+const WARN = { locationEnabled: false, backgroundPermission: false, batteryOptimized: true, powerSave: true };
+
+/** Side panel with everything known about the employee's phone and browser. */
+const DevicePanel = ({ row, now, onClose }) => {
+  const blocks = [
+    ['Mobile app (phone)', row.device?.app, row.online?.app, 'updated app'],
+    ['Website (browser)', row.device?.web, row.online?.web, 'employee website'],
+  ];
+  return (
+    <div role="dialog" aria-modal="true" onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', zIndex: 4000, display: 'flex', justifyContent: 'flex-end' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(440px, 100%)', height: '100%', background: '#fff', overflowY: 'auto', padding: 18, boxShadow: '-12px 0 30px rgba(15,23,42,.2)' }}>
+        <div className="d-flex justify-content-between align-items-start gap-2 mb-3">
+          <div className="d-flex gap-2 align-items-center">
+            <Avatar person={row} size={42} />
+            <div>
+              <div className="mn-strong">{row.name}</div>
+              <div className="mn-muted">{row.employeeId} · device details</div>
+            </div>
+          </div>
+          <button type="button" className="mn-btn sm" onClick={onClose}>Close</button>
+        </div>
+        <div className="mn-alert info mb-3" style={{ fontSize: '.8rem' }}>
+          Tracker: <strong>{LOCATION_STATUS[row.location.status]?.label}</strong>{row.app.message ? ` — ${row.app.message}` : ''}. App used {agoText(row.app.lastSeenAt, now)}.
+        </div>
+        {blocks.map(([title, details, isOnline, from]) => (
+          <div key={title} className="mn-card mb-3">
+            <div className="mn-card-head">
+              <h4 style={{ fontSize: '.9rem' }}>{title}</h4>
+              <span className="mn-chip" style={{ '--c': isOnline ? '#15803d' : '#64748b', '--s': isOnline ? '#dcfce7' : '#f1f5f9' }}><i />{isOnline ? 'Open now' : 'Not open'}</span>
+            </div>
+            {!details ? <div className="mn-empty">No report yet. It arrives when the employee opens the {from}.</div> : (
+              <table className="mn-table">
+                <tbody>
+                  {DEVICE_LABELS.map(([key, label]) => {
+                    const value = deviceValue(key, details[key]);
+                    if (value === null) return null;
+                    const bad = Object.prototype.hasOwnProperty.call(WARN, key) && details[key] === WARN[key];
+                    return (
+                      <tr key={key}>
+                        <td className="mn-muted" style={{ width: '45%' }}>{label}</td>
+                        <td className="mn-strong" style={{ color: bad ? '#dc2626' : undefined }}>{value}</td>
+                      </tr>
+                    );
+                  })}
+                  <tr><td className="mn-muted">Reported</td><td>{agoText(details.updatedAt, now)}</td></tr>
+                </tbody>
+              </table>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
 
 export default EmployeeMonitor;
+

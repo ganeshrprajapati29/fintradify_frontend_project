@@ -698,7 +698,7 @@ const AdminSettings = () => {
                     />
                     <Form.Text muted>
                       Pending punch-ins and punch-outs are approved automatically after this many minutes (0 = off).
-                      Missed punch-outs always wait for HR.
+                      Missed punch-outs are approved too and stay tagged "Auto-closed" so HR can correct the time.
                     </Form.Text>
                   </Form.Group>
                 </Col>

@@ -33,6 +33,12 @@ const formatDistance = (meters) => {
   return value >= 1000 ? `${(value / 1000).toFixed(1)} km` : `${Math.round(value)} m`;
 };
 const mapsUrl = (point) => `https://www.google.com/maps?q=${point.latitude},${point.longitude}`;
+// "4:05" style time left until a moment.
+const countdown = (target, now = Date.now()) => {
+  const seconds = Math.max(0, Math.round((new Date(target).getTime() - now) / 1000));
+  if (seconds >= 3600) return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+};
 const initials = (name) => String(name || 'E').trim().split(/\s+/).map((part) => part[0]).slice(0, 2).join('').toUpperCase();
 
 const AttendanceApprovals = () => {
@@ -52,6 +58,8 @@ const AttendanceApprovals = () => {
   const [notice, setNotice] = useState('');
   const [selected, setSelected] = useState([]);
   const [busy, setBusy] = useState('');
+  const [autoStatus, setAutoStatus] = useState(null);
+  const [clock, setClock] = useState(Date.now());
   const [rejecting, setRejecting] = useState(null); // { ids: [], label }
   const [reason, setReason] = useState('');
 
@@ -70,9 +78,40 @@ const AttendanceApprovals = () => {
     }
   }, [status, flag, date, search, page, limit]);
 
+  const loadAutoStatus = useCallback(async () => {
+    try {
+      const res = await api.get('/attendance/auto-approve-status', { headers: { 'x-silent': '1' } });
+      setAutoStatus(res.data?.data || null);
+    } catch (err) {
+      setAutoStatus(null);
+    }
+  }, []);
+
   useEffect(() => {
     load();
-  }, [load]);
+    loadAutoStatus();
+  }, [load, loadAutoStatus]);
+
+  // Auto-approved records disappear on their own: the queue refreshes while the page is open.
+  useEffect(() => {
+    const refresh = setInterval(() => {
+      if (status === 'pending') {
+        api.get('/attendance/review-queue', { params: { status, flag, date, search, page, limit }, headers: { 'x-silent': '1' } })
+          .then((res) => {
+            setRecords(Array.isArray(res.data?.data) ? res.data.data : []);
+            setSummary(res.data?.summary || {});
+            setPagination(res.data?.pagination || { total: 0, totalPages: 1 });
+          })
+          .catch(() => {});
+      }
+      loadAutoStatus();
+    }, 20000);
+    const tick = setInterval(() => setClock(Date.now()), 1000);
+    return () => {
+      clearInterval(refresh);
+      clearInterval(tick);
+    };
+  }, [status, flag, date, search, page, limit, loadAutoStatus]);
 
   useEffect(() => {
     setSelected([]);
@@ -205,6 +244,22 @@ const AttendanceApprovals = () => {
         )}
       </section>
 
+      {autoStatus && (
+        <div className={`alert mb-0 ${autoStatus.enabled ? 'alert-success' : 'alert-warning'}`} style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>
+            <strong>Auto-approval {autoStatus.enabled ? `ON — every pending punch is approved ${autoStatus.minutes} min after punch-in / punch-out` : 'is OFF'}</strong>
+            {autoStatus.enabled && autoStatus.nextDueAt && (
+              <> · next approval {new Date(autoStatus.nextDueAt).getTime() <= clock ? 'now' : `in ${countdown(autoStatus.nextDueAt, clock)}`}</>
+            )}
+          </span>
+          <span className="small">
+            {autoStatus.lastRunAt ? `Last check ${formatTime(autoStatus.lastRunAt)}` : 'Waiting for first check'}
+            {autoStatus.lastError ? <span className="text-danger"> · {autoStatus.lastError}</span> : ''}
+            {!autoStatus.enabled && ' · Turn it on in Settings → Attendance'}
+          </span>
+        </div>
+      )}
+
       <section className="aa-cards">
         {cards.map(([label, value, color, onClick]) => (
           <button key={label} type="button" className="aa-card" style={{ '--c': color }} onClick={onClick}>
@@ -318,7 +373,18 @@ const AttendanceApprovals = () => {
                         )}
                       </div>
                     </td>
-                    <td><span className={`aa-tag ${record.status}`}>{record.status}</span></td>
+                    <td>
+                      <span className={`aa-tag ${record.status}`}>{record.status}</span>
+                      {record.status === 'pending' && autoStatus?.enabled && (
+                        <div className="small text-muted mt-1" style={{ whiteSpace: 'nowrap' }}>
+                          {(() => {
+                            const due = new Date(record.punchOut || record.punchIn).getTime() + autoStatus.minutes * 60000;
+                            return due <= clock ? 'Auto-approving now…' : `Auto-approves in ${countdown(due, clock)}`;
+                          })()}
+                        </div>
+                      )}
+                      {record.status === 'approved' && record.approvalSource === 'auto' && <div className="small text-muted mt-1">Auto-approved</div>}
+                    </td>
                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                       {record.status !== 'approved' && (
                         <button type="button" className="aa-btn approve sm me-1" disabled={Boolean(busy)} onClick={() => review([record._id], 'approve')}>

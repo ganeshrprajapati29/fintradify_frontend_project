@@ -11,6 +11,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Navbar, Nav, Button, Container, Card, Offcanvas, Alert, Modal, Form, Spinner } from 'react-bootstrap';
 import { useHistory } from 'react-router-dom';
 import axios from 'axios';
+import { browserDetails, closeSocket, getSocket } from '../utils/realtime';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -184,11 +185,21 @@ const EmployeeDashboard = () => {
 
     let cancelled = false;
     let batteryLevel = null;
+    let charging = null;
+
+    // Live connection: HR sees "website open" and this browser's details.
+    const socket = getSocket('employee');
+    const sendDevice = () => {
+      if (socket && socket.connected) socket.emit('device', { ...browserDetails(), batteryLevel, charging });
+    };
+    if (socket) socket.on('connect', sendDevice);
 
     if (navigator.getBattery) {
       navigator.getBattery()
         .then((battery) => {
           batteryLevel = Math.round((battery.level || 0) * 100);
+          charging = Boolean(battery.charging);
+          sendDevice();
         })
         .catch(() => {});
     }
@@ -201,29 +212,34 @@ const EmployeeDashboard = () => {
       const now = Date.now();
       const movedEnough =
         last.latitude === null ||
-        Math.abs(latitude - last.latitude) > 0.0001 ||
-        Math.abs(longitude - last.longitude) > 0.0001;
+        Math.abs(latitude - last.latitude) > 0.00005 ||
+        Math.abs(longitude - last.longitude) > 0.00005;
 
+      // Moving: every few seconds; standing still: once a minute.
       if (!movedEnough && now - last.at < 60000) return;
+      if (movedEnough && now - last.at < 3000) return;
 
       lastLocationSentRef.current = { at: now, latitude, longitude };
+      const point = {
+        latitude,
+        longitude,
+        accuracy,
+        speed,
+        heading,
+        altitude,
+        batteryLevel,
+        source: 'gps',
+        timestamp: new Date(position.timestamp || now).toISOString(),
+        deviceInfo: navigator.userAgent,
+      };
 
+      // Socket first (instant on the admin map); plain HTTP when it is not connected.
+      if (socket && socket.connected) {
+        socket.emit('location', point);
+        return;
+      }
       try {
-        await axios.post(
-          `${process.env.REACT_APP_API_URL}/tracking/update-location`,
-          {
-            latitude,
-            longitude,
-            accuracy,
-            speed,
-            heading,
-            altitude,
-            batteryLevel,
-            source: 'gps',
-            deviceInfo: navigator.userAgent,
-          },
-          { headers: authHeaders }
-        );
+        await axios.post(`${process.env.REACT_APP_API_URL}/tracking/update-location`, point, { headers: authHeaders });
       } catch (err) {
         console.warn('Location update skipped:', err.response?.data?.message || err.message);
       }
@@ -232,12 +248,13 @@ const EmployeeDashboard = () => {
     const watcherId = navigator.geolocation.watchPosition(
       sendLocation,
       () => {},
-      { enableHighAccuracy: true, maximumAge: 30000, timeout: 15000 }
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
     );
 
     return () => {
       cancelled = true;
       navigator.geolocation.clearWatch(watcherId);
+      if (socket) socket.off('connect', sendDevice);
     };
   }, []);
 
@@ -382,6 +399,7 @@ const EmployeeDashboard = () => {
     } catch (err) {
       // Sign out locally anyway.
     }
+    closeSocket();
     localStorage.removeItem('token');
     history.push('/');
   };
