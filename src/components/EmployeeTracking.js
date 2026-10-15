@@ -28,6 +28,7 @@ const STATUS = {
   office: { label: 'At office', color: '#16a34a', soft: '#dcfce7', rank: 3 },
   outside: { label: 'Outside area', color: '#dc2626', soft: '#fee2e2', rank: 0 },
   nosignal: { label: 'No location', color: '#d97706', soft: '#fef3c7', rank: 4 },
+  gpsoff: { label: 'GPS off', color: '#ea580c', soft: '#ffedd5', rank: 0.5 },
   offduty: { label: 'Off duty', color: '#94a3b8', soft: '#f1f5f9', rank: 5 },
 };
 
@@ -45,6 +46,22 @@ const positionOf = (employee) => {
   const lng = Number(gps?.longitude ?? saved?.longitude);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
   return [lat, lng];
+};
+
+// The phone told the server why it cannot share location.
+const TRACKER_ISSUES = {
+  gps_off: 'GPS off',
+  permission_denied: 'Permission off',
+  logged_out: 'Logged out',
+  stopped: 'Tracking stopped',
+};
+const trackerIssueOf = (employee) => {
+  const state = employee.trackingStatus?.state;
+  return state && TRACKER_ISSUES[state] ? state : null;
+};
+const batteryOf = (employee) => {
+  const value = employee.currentLocation?.batteryLevel ?? employee.trackingStatus?.batteryLevel;
+  return isNum(value) ? Math.round(Number(value)) : null;
 };
 
 const lastSeenOf = (employee) => employee.currentLocation?.timestamp || employee.location?.lastUpdated || employee.lastLocationUpdate || null;
@@ -126,8 +143,15 @@ const describe = (employee, trail, now, office) => {
   const ownZone = employee.geofence?.source === 'employee' && Number(employee.geofence.radiusMeters) <= 5000;
   const atBase = ownZone ? employee.insideZone === true : (fromOffice !== null && fromOffice <= presenceRadius(office));
 
+  // A newer status report than the last GPS point (e.g. GPS switched off) wins.
+  const issue = trackerIssueOf(employee);
+  const issueAt = employee.trackingStatus?.updatedAt ? new Date(employee.trackingStatus.updatedAt).getTime() : 0;
+  const lastGpsAt = lastSeenOf(employee) ? new Date(lastSeenOf(employee)).getTime() : 0;
+  const trackerDown = Boolean(issue) && issue !== 'stopped' && (!live || issueAt > lastGpsAt);
+
   let key;
-  if (!employee.isActive) key = 'offduty';
+  if (trackerDown && (employee.isActive || issue !== 'logged_out')) key = 'gpsoff';
+  else if (!employee.isActive) key = 'offduty';
   else if (!position) key = 'nosignal';
   else if (employee.insideZone === false) key = 'outside';
   else if (moving) key = 'moving';
@@ -138,7 +162,9 @@ const describe = (employee, trail, now, office) => {
   const away = fromOffice !== null ? `${formatDistance(fromOffice)} ${compassOf(bearing)} of office` : '';
   const near = shortAddress(employee.currentLocation?.address);
   let activity;
-  if (key === 'offduty') activity = employee.punchOut ? `Punched out at ${formatClock(employee.punchOut)}` : 'Not punched in today';
+  if (key === 'gpsoff') activity = `${TRACKER_ISSUES[issue]} on phone since ${formatClock(employee.trackingStatus.updatedAt)}${employee.isActive ? ' · on duty' : ''}`;
+  else if (key === 'offduty' && live) activity = `Off duty · ${near || away || 'live location'}`;
+  else if (key === 'offduty') activity = employee.punchOut ? `Punched out at ${formatClock(employee.punchOut)}` : 'Not punched in today';
   else if (key === 'nosignal') activity = `Punched in at ${formatClock(employee.punchIn)} · location not shared`;
   else if (key === 'outside') activity = `${formatDistance(employee.distanceFromZone)} outside ${employee.geofence?.label || 'punch area'}`;
   else if (key === 'moving') activity = `Moving ${Math.round(kmh)} km/h · ${away}`;
@@ -147,11 +173,12 @@ const describe = (employee, trail, now, office) => {
 
   let signal;
   if (!position) signal = 'No location';
-  else if (live) signal = 'Live GPS';
+  else if (live) signal = employee.currentLocation?.client === 'web' ? 'Live (website)' : 'Live GPS (app)';
   else if (source === 'punch') signal = `Punch location · ${formatClock(employee.currentLocation?.timestamp)}`;
   else signal = `Last GPS ${agoText(age)}`;
 
-  return { key, ...STATUS[key], position, age, live, moving, kmh, activity, signal, fromOffice, bearing, source };
+  const label = key === 'gpsoff' ? TRACKER_ISSUES[issue] : STATUS[key].label;
+  return { key, ...STATUS[key], label, position, age, live, moving, kmh, activity, signal, fromOffice, bearing, source, issue, battery: batteryOf(employee) };
 };
 
 /**
@@ -338,6 +365,7 @@ const FILTERS = [
   ['moving', 'Moving'],
   ['live', 'Live GPS'],
   ['outside', 'Outside area'],
+  ['gpsoff', 'GPS / permission off'],
   ['nosignal', 'No location'],
   ['offduty', 'Off duty'],
 ];
@@ -349,7 +377,7 @@ const EmployeeTracking = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [filter, setFilter] = useState('onduty');
+  const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [view, setView] = useState('map');
   const [mapStyle, setMapStyle] = useState(() => (readTheme() === 'dark' ? 'dark' : 'light'));
@@ -439,10 +467,14 @@ const EmployeeTracking = () => {
         timestamp: stamp,
         batteryLevel: data.batteryLevel ?? employee.currentLocation?.batteryLevel,
         source: data.source || 'gps',
+        client: data.client || 'app',
       },
       insideZone: typeof data.insideZone === 'boolean' ? data.insideZone : employee.insideZone,
       distanceFromZone: isNum(data.distanceFromZone) ? data.distanceFromZone : employee.distanceFromZone,
       lastLocationUpdate: stamp,
+      trackingStatus: employee.trackingStatus && employee.trackingStatus.state !== 'running'
+        ? { ...employee.trackingStatus, state: 'running', updatedAt: stamp }
+        : employee.trackingStatus,
     } : employee)));
     setTrails((prev) => {
       const points = prev[data.employeeId] || [];
@@ -494,6 +526,13 @@ const EmployeeTracking = () => {
           try { applyLivePoint(JSON.parse(event.data)); } catch (parseError) { /* ignore malformed frame */ }
         });
         source.addEventListener('attendance', () => fetchTracking(true));
+        source.addEventListener('status', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            setEmployees((prev) => prev.map((employee) => (employee._id === data.employeeId ? { ...employee, trackingStatus: data } : employee)));
+            setLastEvent(new Date());
+          } catch (parseError) { /* ignore malformed frame */ }
+        });
         source.onerror = () => {
           setLiveConnected(false);
           if (source) source.close();
@@ -527,13 +566,13 @@ const EmployeeTracking = () => {
   })), [employees, trails, now, office]);
 
   const counts = useMemo(() => {
-    const base = { total: rows.length, onduty: 0, live: 0, moving: 0, office: 0, field: 0, outside: 0, nosignal: 0, offduty: 0, late: 0, distance: 0 };
+    const base = { total: rows.length, onduty: 0, live: 0, moving: 0, office: 0, field: 0, outside: 0, nosignal: 0, offduty: 0, gpsoff: 0, late: 0, distance: 0 };
     rows.forEach(({ employee, info }) => {
       base[info.key] += 1;
       if (employee.isActive) base.onduty += 1;
       if (info.live) base.live += 1;
       if (employee.isActive && employee.isLate) base.late += 1;
-      if (employee.isActive) base.distance += pathLength(trails[employee._id] || []);
+      if (employee.isActive || info.live) base.distance += pathLength(trails[employee._id] || []);
     });
     return base;
   }, [rows, trails]);
@@ -722,6 +761,7 @@ const EmployeeTracking = () => {
     ['field', 'On field', counts.field, STATUS.field.color, 'away from office'],
     ['moving', 'Moving', counts.moving, STATUS.moving.color, 'travelling now'],
     ['live', 'Live GPS', counts.live, '#0891b2', 'phones sending location'],
+    ['gpsoff', 'GPS off', counts.gpsoff, STATUS.gpsoff.color, 'location switched off'],
     ['offduty', 'Off duty', counts.offduty, STATUS.offduty.color, 'not punched in'],
   ];
 
@@ -744,7 +784,7 @@ const EmployeeTracking = () => {
         .lt-btn.active { background: #0a1f8f; border-color: #0a1f8f; color: #fff; }
         .lt-btn.ghost { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.25); color: #fff; }
         .lt-btn.sm { padding: 4px 9px; font-size: .72rem; }
-        .lt-kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+        .lt-kpis { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; }
         .lt-kpi { background: #fff; border: 1px solid #e6e9f2; border-radius: 14px; padding: 12px 14px; cursor: pointer; box-shadow: 0 6px 18px rgba(15,23,42,.05); border-left: 4px solid var(--c, #0a1f8f); text-align: left; }
         .lt-kpi.active { outline: 2px solid var(--c, #0a1f8f); }
         .lt-kpi b { display: block; font-size: 1.6rem; font-weight: 800; line-height: 1.1; }
@@ -851,7 +891,7 @@ const EmployeeTracking = () => {
         .lt-table th { text-align: left; padding: 10px 12px; font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: #64748b; background: #f8fafc; border-bottom: 1px solid #e6e9f2; white-space: nowrap; }
         .lt-table td { padding: 10px 12px; border-bottom: 1px solid #f0f2f7; vertical-align: middle; }
         .lt-table tr:hover td { background: #f8fafc; cursor: pointer; }
-        @media (max-width: 1320px) { .lt-grid { grid-template-columns: 1fr; } .lt-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .lt-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .lt-radar-wrap { max-width: 520px; margin: 0 auto; } }
+        @media (max-width: 1320px) { .lt-grid { grid-template-columns: 1fr; } .lt-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } .lt-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .lt-radar-wrap { max-width: 520px; margin: 0 auto; } }
         @media (max-width: 640px) { .lt-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .lt-map { height: 440px; } }
       `}</style>
 
@@ -953,7 +993,7 @@ const EmployeeTracking = () => {
                     {/* everyone's recent route */}
                     {showTrails && !selectedId && located.map(({ employee, info }) => {
                       const trail = trails[employee._id];
-                      if (!trail || trail.length < 2 || !employee.isActive) return null;
+                      if (!trail || trail.length < 2 || (!employee.isActive && !info.live)) return null;
                       return (
                         <Polyline
                           key={`trail-${employee._id}`}
@@ -1034,12 +1074,12 @@ const EmployeeTracking = () => {
                 )}
                 {!loading && located.length === 0 && (
                   <div className="lt-legend" style={{ left: '50%', bottom: '50%', transform: 'translate(-50%, 50%)', fontSize: '.85rem', fontWeight: 600 }}>
-                    Nobody to show for this filter. Positions appear when employees punch in from the app.
+                    Nobody to show for this filter. Positions appear as soon as employees sign in to the app with location on.
                   </div>
                 )}
                 {!loading && (
                   <div className="lt-legend">
-                    {['office', 'field', 'moving', 'outside', 'offduty'].map((key) => (
+                    {['office', 'field', 'moving', 'outside', 'gpsoff', 'offduty'].map((key) => (
                       <span key={key}><i style={{ background: STATUS[key].color }} />{STATUS[key].label}</span>
                     ))}
                     <span style={{ color: '#64748b' }}>dashed ring = no live GPS</span>
@@ -1121,13 +1161,21 @@ const EmployeeTracking = () => {
                   <div className="lt-stat"><span>Travelled {routeDate === todayKey() ? 'today' : routeDate}</span><b>{routeLoading ? 'Loading…' : route ? formatDistance(route.totalDistance) : '—'}</b></div>
                   <div className="lt-stat"><span>Stops / moving</span><b>{route ? `${stays.length} stops · ${formatDuration(movingMinutes)} moving` : '—'}</b></div>
                   <div className="lt-stat"><span>From office</span><b>{selected.info.fromOffice !== null ? `${formatDistance(selected.info.fromOffice)} ${compassOf(selected.info.bearing)}` : '—'}</b></div>
-                  <div className="lt-stat"><span>Battery / accuracy</span><b>{isNum(selected.employee.currentLocation?.batteryLevel) ? `${selected.employee.currentLocation.batteryLevel}%` : '—'}{isNum(selected.employee.currentLocation?.accuracy) ? ` · ±${Math.round(selected.employee.currentLocation.accuracy)} m` : ''}</b></div>
+                  <div className="lt-stat"><span>Battery / accuracy</span><b>{selected.info.battery !== null ? `${selected.info.battery}%` : '—'}{isNum(selected.employee.currentLocation?.accuracy) ? ` · ±${Math.round(selected.employee.currentLocation.accuracy)} m` : ''}</b></div>
+                  <div className="lt-stat"><span>Phone tracker</span><b style={{ color: selected.info.issue && selected.info.issue !== 'stopped' ? STATUS.gpsoff.color : '#15803d' }}>{selected.info.issue ? TRACKER_ISSUES[selected.info.issue] : selected.info.live ? 'Running' : (selected.employee.trackingStatus?.state ? 'Running' : '—')}</b></div>
+                  <div className="lt-stat"><span>Device</span><b>{selected.employee.trackingStatus?.device || '—'}</b></div>
+                  <div className="lt-stat"><span>App version</span><b>{selected.employee.trackingStatus?.appVersion || '—'}</b></div>
                 </div>
                 {selected.employee.currentLocation?.address && <div className="small"><b>Near:</b> {selected.employee.currentLocation.address}</div>}
                 {selected.employee.todaysTasks?.length > 0 && (
                   <div className="small"><b>Today's tasks:</b> {selected.employee.todaysTasks.map((task) => `${task.title} (${task.status})`).join(' · ')}</div>
                 )}
-                {!selected.info.live && selected.employee.isActive && selected.info.position && (
+                {selected.info.key === 'gpsoff' && (
+                  <div className="small" style={{ color: '#9a3412', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '8px 10px' }}>
+                    {selected.info.activity}. {selected.employee.trackingStatus?.message || ''} The map shows the last known location until the phone reports again.
+                  </div>
+                )}
+                {!selected.info.live && selected.info.key !== 'gpsoff' && selected.employee.isActive && selected.info.position && (
                   <div className="small" style={{ color: '#b45309', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: '8px 10px' }}>
                     This employee's phone is not sending live location right now, so the map shows their {selected.info.source === 'punch' ? 'punch-in location' : 'last known location'}. Live movement appears when they use the latest AeroAttendance app with location allowed.
                   </div>
@@ -1332,7 +1380,7 @@ const EmployeeTracking = () => {
                   <div className="lt-row-main">
                     <strong>{employee.name}</strong>
                     <small>{info.activity}</small>
-                    <small>{employee.shift?.name || 'No shift'}{employee.isActive ? ` · in ${formatClock(employee.punchIn)}` : ''} · {info.signal}</small>
+                    <small>{employee.shift?.name || 'No shift'}{employee.isActive ? ` · in ${formatClock(employee.punchIn)}` : ''} · {info.signal}{info.battery !== null ? ` · ${info.battery}% battery` : ''}</small>
                   </div>
                   <span className="lt-chip" style={{ '--c': info.color, '--s': info.soft }}><i />{info.label}</span>
                 </button>

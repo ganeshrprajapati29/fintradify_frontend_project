@@ -375,7 +375,13 @@ const EmployeeDashboard = () => {
     },
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Recorded in HR's activity log; signing out never waits long for it.
+    try {
+      await axios.post(`${process.env.REACT_APP_API_URL}/auth/logout`, {}, { headers: authHeaders, timeout: 4000 });
+    } catch (err) {
+      // Sign out locally anyway.
+    }
     localStorage.removeItem('token');
     history.push('/');
   };

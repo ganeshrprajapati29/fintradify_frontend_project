@@ -1,6 +1,5 @@
  import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Bar, Line, Pie, Doughnut } from 'react-chartjs-2';
 import { useHistory } from 'react-router-dom';
 import { Container, Navbar, Nav, Button, Card, Table, Alert, Offcanvas, Badge, Form } from 'react-bootstrap';
 import {
@@ -35,7 +34,10 @@ import EmployeeTeams from './EmployeeTeams';
 import EmployeeTracking from './EmployeeTracking';
 import EmployeeLocationTracker from './EmployeeLocationTracker';
 import AttendanceApprovals from './AttendanceApprovals';
-import DashboardLiveOps from './DashboardLiveOps';
+import AdminOverview from './AdminOverview';
+import EmployeeMonitor from './EmployeeMonitor';
+import EmployeeActivity from './EmployeeActivity';
+import ActivityAlerts from './ActivityAlerts';
 import UserManual from './UserManual';
 import RelievingLetter from './RelievingLetter';
 import OfferLetter from './OfferLetter';
@@ -65,6 +67,9 @@ const ADMIN_TABS = [
   'unblock-employees',
   'teams',
   'tracking',
+  'employee-monitor',
+  'activity-log',
+  'activity-alerts',
   'employee-locations',
   'attendance',
   'attendance-approvals',
@@ -100,7 +105,10 @@ const TAB_LABELS = {
   'block-employees': 'Block Employees',
   'unblock-employees': 'Unblock Employees',
   teams: 'Teams',
-  tracking: 'Live Tracking',
+  tracking: 'Live Tracking Map',
+  'employee-monitor': 'Employee Monitor',
+  'activity-log': 'Activity Tracking',
+  'activity-alerts': 'Activity Alerts',
   'employee-locations': 'Employee Locations',
   attendance: 'Attendance',
   'attendance-approvals': 'Attendance Approvals',
@@ -128,7 +136,8 @@ const TAB_LABELS = {
 
 const ADMIN_NAV_GROUPS = [
   { title: 'Overview', items: ['overview', 'reports-center'] },
-  { title: 'People', items: ['add-employee', 'edit-employee', 'employee-list', 'role-permissions', 'block-employees', 'unblock-employees', 'teams', 'tracking', 'employee-locations'] },
+  { title: 'Live Monitoring', items: ['employee-monitor', 'tracking', 'activity-log', 'activity-alerts', 'employee-locations'] },
+  { title: 'People', items: ['add-employee', 'edit-employee', 'employee-list', 'role-permissions', 'block-employees', 'unblock-employees', 'teams'] },
   { title: 'Attendance & Leave', items: ['attendance', 'attendance-approvals', 'manual-attendance', 'active-attendance', 'leaves', 'paid-leaves', 'wfh', 'attendance-radius', 'shifts'] },
   { title: 'Work & Payroll', items: ['monthly-performance', 'tasks', 'salary', 'reimbursements'] },
   { title: 'HR Documents', items: ['relieving-letter', 'offer-letter', 'certificates', 'documents', 'compliance-center'] },
@@ -139,7 +148,7 @@ const ADMIN_NAV_GROUPS = [
 const ACCESS_MODULES = [
   { key: 'people', label: 'People', tabs: ['add-employee', 'edit-employee', 'employee-list', 'role-permissions', 'block-employees', 'unblock-employees', 'teams'] },
   { key: 'overview', label: 'Dashboard & Reports', tabs: ['overview', 'reports-center', 'monthly-performance'] },
-  { key: 'attendance', label: 'Attendance & Tracking', tabs: ['attendance', 'attendance-approvals', 'manual-attendance', 'active-attendance', 'paid-leaves', 'attendance-radius', 'shifts', 'tracking', 'employee-locations'] },
+  { key: 'attendance', label: 'Attendance & Tracking', tabs: ['attendance', 'attendance-approvals', 'manual-attendance', 'active-attendance', 'paid-leaves', 'attendance-radius', 'shifts', 'tracking', 'employee-monitor', 'activity-log', 'activity-alerts', 'employee-locations'] },
   { key: 'leave', label: 'Leave Requests', tabs: ['leaves'] },
   { key: 'workFromHome', label: 'Work From Home', tabs: ['wfh'] },
   { key: 'tasks', label: 'Tasks', tabs: ['tasks'] },
@@ -189,6 +198,9 @@ const renderAdminNavIcon = (tab) => (
     {tab === 'reports-center' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 19h16M7 16V9m5 7V5m5 11v-4M6 5h12" />}
     {['add-employee', 'edit-employee', 'employee-list', 'block-employees', 'unblock-employees', 'teams'].includes(tab) && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m4 6v-2a4 4 0 00-8 0v2m12-10a4 4 0 11-8 0 4 4 0 018 0zm6 1a3 3 0 11-6 0 3 3 0 016 0z" />}
     {tab === 'tracking' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 11a3 3 0 100-6 3 3 0 000 6zm0 10s7-4.5 7-11a7 7 0 10-14 0c0 6.5 7 11 7 11z" />}
+    {tab === 'employee-monitor' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5h18v11H3zM8 20h8M12 16v4M7 12l3-3 2 2 4-4" />}
+    {tab === 'activity-log' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 2M3 12a9 9 0 1018 0 9 9 0 00-18 0zM3 4v4h4" />}
+    {tab === 'activity-alerts' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16v12H4zM4 7l8 6 8-6" />}
     {tab === 'employee-locations' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />}
     {tab === 'user-manual' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />}
     {tab === 'attendance-approvals' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4M8 7V3m8 4V3M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />}
@@ -686,42 +698,12 @@ const RolePermissions = () => {
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }));
-  const [overview, setOverview] = useState({});
   const [showSidebar, setShowSidebar] = useState(false);
   const [error, setError] = useState('');
   const [profile, setProfile] = useState({});
   const [notificationCount, setNotificationCount] = useState(0);
-  const [dashboardMetrics, setDashboardMetrics] = useState({});
-  const [dashboardEmployees, setDashboardEmployees] = useState([]);
-  const [dashboardLeaves, setDashboardLeaves] = useState([]);
-  const [dashboardWFHRequests, setDashboardWFHRequests] = useState([]);
-  const [dashboardTasks, setDashboardTasks] = useState([]);
-  const [dashboardSalarySlips, setDashboardSalarySlips] = useState([]);
-  const [dashboardReimbursements, setDashboardReimbursements] = useState([]);
   const history = useHistory();
   const authHeaders = { Authorization: `Bearer ${localStorage.getItem('token')}` };
-
-  const getArrayPayload = (payload) => {
-    if (Array.isArray(payload)) return payload;
-    if (Array.isArray(payload?.data)) return payload.data;
-    if (Array.isArray(payload?.records)) return payload.records;
-    if (Array.isArray(payload?.data?.records)) return payload.data.records;
-    return [];
-  };
-
-  const getStatus = (value) => String(value || '').trim().toLowerCase();
-
-  const getAmount = (value) => Number(value?.netSalary || value?.amount || value?.salary || 0) || 0;
-
-  const formatCurrency = (value) => `Rs. ${(Number(value) || 0).toLocaleString('en-IN')}`;
-
-  // Dynamic greeting based on time
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
-  };
 
   // Fetch profile
   useEffect(() => {
@@ -750,81 +732,6 @@ const AdminDashboard = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch attendance overview
-  useEffect(() => {
-    if (!profile.role) return;
-    if (!hasModuleAccess(profile, 'attendance')) {
-      setOverview({});
-      return;
-    }
-    const fetchOverview = async () => {
-      try {
-        const res = await axios.get(`${process.env.REACT_APP_API_URL}/attendance/overview`, { headers: authHeaders });
-        // Keep only { 'YYYY-MM-DD': [rows] } entries; the API returns { message } when there is no attendance yet.
-        const data = res.data && typeof res.data === 'object' ? res.data : {};
-        setOverview(Object.fromEntries(Object.entries(data).filter(([, rows]) => Array.isArray(rows))));
-        setError('');
-      } catch (err) {
-        setError(err.response?.data?.message || 'Failed to fetch attendance overview');
-        console.error('Error fetching overview:', err);
-      }
-    };
-    fetchOverview();
-  }, [profile]);
-
-  // Fetch real admin dashboard data
-  useEffect(() => {
-    if (!profile.role) return;
-    const fetchDashboardData = async () => {
-      try {
-        const requests = {
-          metrics: hasModuleAccess(profile, 'overview') && axios.get(`${process.env.REACT_APP_API_URL}/dashboard/metrics`, { headers: authHeaders }),
-          employees: hasModuleAccess(profile, 'people') && axios.get(`${process.env.REACT_APP_API_URL}/employees`, { headers: authHeaders }),
-          leaves: hasModuleAccess(profile, 'leave') && axios.get(`${process.env.REACT_APP_API_URL}/leaves`, { headers: authHeaders }),
-          tasks: hasModuleAccess(profile, 'tasks') && axios.get(`${process.env.REACT_APP_API_URL}/tasks`, { headers: authHeaders }),
-          salary: hasModuleAccess(profile, 'salary') && axios.get(`${process.env.REACT_APP_API_URL}/salary`, { headers: authHeaders }),
-          reimbursements: hasModuleAccess(profile, 'reimbursements') && axios.get(`${process.env.REACT_APP_API_URL}/reimbursements`, { headers: authHeaders }),
-          wfh: hasModuleAccess(profile, 'workFromHome') && axios.get(`${process.env.REACT_APP_API_URL}/wfh`, { headers: authHeaders }),
-        };
-        const entries = Object.entries(requests).filter(([, request]) => request);
-        const results = await Promise.allSettled(entries.map(([, request]) => request));
-        const settled = Object.fromEntries(entries.map(([key], index) => [key, results[index]]));
-
-        if (settled.metrics?.status === 'fulfilled') {
-          setDashboardMetrics(settled.metrics.value.data?.data || settled.metrics.value.data || {});
-        }
-
-        if (settled.employees?.status === 'fulfilled') {
-          setDashboardEmployees(getArrayPayload(settled.employees.value.data));
-        }
-
-        if (settled.leaves?.status === 'fulfilled') {
-          setDashboardLeaves(getArrayPayload(settled.leaves.value.data));
-        }
-
-        if (settled.wfh?.status === 'fulfilled') {
-          setDashboardWFHRequests(getArrayPayload(settled.wfh.value.data));
-        }
-
-        if (settled.tasks?.status === 'fulfilled') {
-          setDashboardTasks(getArrayPayload(settled.tasks.value.data));
-        }
-
-        if (settled.salary?.status === 'fulfilled') {
-          setDashboardSalarySlips(getArrayPayload(settled.salary.value.data));
-        }
-
-        if (settled.reimbursements?.status === 'fulfilled') {
-          setDashboardReimbursements(getArrayPayload(settled.reimbursements.value.data));
-        }
-      } catch (err) {
-        console.error('Error fetching admin dashboard data:', err);
-      }
-    };
-
-    fetchDashboardData();
-  }, [profile]);
-
   // Fetch notification count
   useEffect(() => {
     const fetchNotificationCount = async () => {
@@ -838,117 +745,8 @@ const AdminDashboard = () => {
     fetchNotificationCount();
   }, []);
 
-  // Chart data
-  const chartData = Object.keys(overview || {})
-    .filter((date) => Array.isArray(overview[date]))
-    .sort((a, b) => new Date(a) - new Date(b))
-    .map((date) => ({
-      date,
-      totalHours: overview[date].reduce((sum, att) => sum + (parseFloat(att.hoursWorked) || 0), 0),
-      employeesPresent: overview[date].length,
-    }));
-
-  const totalEmployees = dashboardEmployees.length || dashboardMetrics.totalEmployees || 0;
-  const activeEmployees = dashboardEmployees.filter((emp) => getStatus(emp.status || 'active') === 'active').length;
-  const presentToday = dashboardMetrics.presentToday || chartData[chartData.length - 1]?.employeesPresent || 0;
-  const attendanceRate = totalEmployees ? Math.round((presentToday / totalEmployees) * 100) : (dashboardMetrics.todaysAttendance || 0);
-  const totalTrackedHours = chartData.reduce((sum, item) => sum + item.totalHours, 0);
-  const averageHours = chartData.length ? totalTrackedHours / chartData.length : 0;
-  const pendingLeaves = dashboardLeaves.filter((leave) => getStatus(leave.status) === 'pending').length || dashboardMetrics.pendingLeaves || 0;
-  const approvedLeaves = dashboardLeaves.filter((leave) => getStatus(leave.status) === 'approved').length || dashboardMetrics.approvedLeaves || 0;
-  const rejectedLeaves = dashboardLeaves.filter((leave) => getStatus(leave.status) === 'rejected').length || dashboardMetrics.rejectedLeaves || 0;
-  const pendingWFHRequests = dashboardWFHRequests.filter((request) => getStatus(request.status) === 'pending').length;
-  const approvedWFHRequests = dashboardWFHRequests.filter((request) => getStatus(request.status) === 'approved').length;
-  const pendingTasks = dashboardTasks.filter((task) => !['completed', 'done'].includes(getStatus(task.status))).length;
-  const completedTasks = dashboardTasks.filter((task) => ['completed', 'done'].includes(getStatus(task.status))).length;
-  const taskCompletionRate = dashboardTasks.length ? Math.round((completedTasks / dashboardTasks.length) * 100) : 0;
-  const pendingReimbursements = dashboardReimbursements.filter((item) => ['pending', 'submitted'].includes(getStatus(item.status))).length;
-  const approvedReimbursementAmount = dashboardReimbursements
-    .filter((item) => getStatus(item.status) === 'approved')
-    .reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-  const currentMonth = new Date().toISOString().slice(0, 7);
-  const monthlySalary = dashboardSalarySlips
-    .filter((slip) => String(slip.month || '').startsWith(currentMonth))
-    .reduce((sum, slip) => sum + getAmount(slip), 0) || dashboardMetrics.monthlySalary || 0;
-  const recentAttendanceRows = Object.keys(overview || {})
-    .sort((a, b) => new Date(b) - new Date(a))
-    .flatMap((date) => (Array.isArray(overview[date]) ? overview[date] : []).map((att) => ({ ...att, date })))
-    .slice(0, 8);
-  const departmentEntries = Object.entries(
-    dashboardEmployees.reduce((acc, emp) => {
-      const label = emp.department || emp.position || 'Unassigned';
-      acc[label] = (acc[label] || 0) + 1;
-      return acc;
-    }, {})
-  ).sort((a, b) => b[1] - a[1]).slice(0, 6);
-  const salaryTrendEntries = Object.entries(
-    dashboardSalarySlips.reduce((acc, slip) => {
-      const month = slip.month || 'Unmapped';
-      acc[month] = (acc[month] || 0) + getAmount(slip);
-      return acc;
-    }, {})
-  ).sort((a, b) => new Date(`${a[0]}-01`) - new Date(`${b[0]}-01`)).slice(-6);
   const activeNavLabel = TAB_LABELS[activeTab] || 'Dashboard';
   const visibleTabs = ADMIN_TABS.filter((tab) => hasTabAccess(profile, tab));
-
-  // Chart.js configuration
-  const chartConfig = {
-    labels: chartData.map((item) => item.date),
-    datasets: [
-      {
-        label: 'Total Hours Worked',
-        data: chartData.map((item) => item.totalHours),
-        backgroundColor: '#1e40af',
-        borderColor: '#1e40af',
-        borderWidth: 1,
-      },
-      {
-        label: 'Employees Present',
-        data: chartData.map((item) => item.employeesPresent),
-        backgroundColor: '#3b82f6',
-        borderColor: '#3b82f6',
-        borderWidth: 1,
-      },
-    ],
-  };
-
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-      x: {
-        grid: {
-          color: '#bfdbfe',
-        },
-        ticks: {
-          color: '#1e40af',
-        },
-      },
-      y: {
-        grid: {
-          color: '#bfdbfe',
-        },
-        ticks: {
-          color: '#1e40af',
-        },
-      },
-    },
-    plugins: {
-      legend: {
-        labels: {
-          color: '#1e40af',
-        },
-      },
-      tooltip: {
-        backgroundColor: '#f8fafc',
-        titleColor: '#1e40af',
-        bodyColor: '#1e40af',
-        borderColor: '#bfdbfe',
-        borderWidth: 1,
-        cornerRadius: 6,
-      },
-    },
-  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -2386,285 +2184,13 @@ const AdminDashboard = () => {
               </Alert>
             )}
             {activeTab === 'overview' && (
-              <div className="admin-dashboard-modern animate__animated animate__fadeInUp">
-                <section className="admin-hero-card">
-                  <div>
-                    <p className="admin-hero-eyebrow">Admin dashboard</p>
-                    <h1 className="admin-hero-title">{getGreeting()}, {profile.name || 'Admin'}</h1>
-                    <div className="admin-hero-meta">
-                      <span className="admin-pill">{activeEmployees} active employees</span>
-                      <span className="admin-pill">{presentToday} present today</span>
-                      <span className="admin-pill">{currentTime}</span>
-                    </div>
-                  </div>
-                  <div className="admin-hero-actions">
-                    {['add-employee', 'attendance-approvals', 'tracking', 'leaves', 'wfh', 'tasks'].filter((tab) => hasTabAccess(profile, tab)).map((tab) => (
-                      <button key={tab} type="button" className="admin-action-btn" onClick={() => handleTabClick(tab)}>
-                        {TAB_LABELS[tab] || tab}
-                      </button>
-                    ))}
-                  </div>
-                </section>
-
-                {hasModuleAccess(profile, 'attendance') && <DashboardLiveOps onNavigate={handleTabClick} />}
-
-                <section className="admin-kpi-grid">
-                  <div className="admin-kpi-card" style={{ '--accent': '#bfdbfe' }}>
-                    <p className="admin-kpi-label">Total Employees</p>
-                    <h2 className="admin-kpi-value">{totalEmployees}</h2>
-                    <p className="admin-kpi-note">{activeEmployees} active accounts</p>
-                  </div>
-                  <div className="admin-kpi-card" style={{ '--accent': '#bae6fd' }}>
-                    <p className="admin-kpi-label">Attendance Today</p>
-                    <h2 className="admin-kpi-value">{attendanceRate}%</h2>
-                    <p className="admin-kpi-note">{presentToday} present employees</p>
-                  </div>
-                  <div className="admin-kpi-card" style={{ '--accent': '#fed7aa' }}>
-                    <p className="admin-kpi-label">Pending Leaves</p>
-                    <h2 className="admin-kpi-value">{pendingLeaves}</h2>
-                    <p className="admin-kpi-note">{approvedLeaves} approved / {rejectedLeaves} rejected</p>
-                  </div>
-                  <div className="admin-kpi-card" style={{ '--accent': '#bbf7d0' }}>
-                    <p className="admin-kpi-label">Task Completion</p>
-                    <h2 className="admin-kpi-value">{taskCompletionRate}%</h2>
-                    <p className="admin-kpi-note">{pendingTasks} tasks pending</p>
-                  </div>
-                  <div className="admin-kpi-card" style={{ '--accent': '#fecdd3' }}>
-                    <p className="admin-kpi-label">Monthly Payroll</p>
-                    <h2 className="admin-kpi-value">{formatCurrency(monthlySalary)}</h2>
-                    <p className="admin-kpi-note">{dashboardSalarySlips.length} salary slips</p>
-                  </div>
-                  <div className="admin-kpi-card" style={{ '--accent': '#ddd6fe' }}>
-                    <p className="admin-kpi-label">Pending WFH Requests</p>
-                    <h2 className="admin-kpi-value">{pendingWFHRequests}</h2>
-                    <p className="admin-kpi-note">{approvedWFHRequests} approved</p>
-                  </div>
-                </section>
-
-                <section className="admin-dashboard-grid">
-                  <div className="admin-panel">
-                    <div className="admin-panel-header">
-                      <div>
-                        <p className="admin-panel-eyebrow">Attendance insight</p>
-                        <h2 className="admin-panel-title">Daily presence and hours</h2>
-                      </div>
-                      <span className="admin-pill">{chartData.length} days</span>
-                    </div>
-                    {chartData.length ? (
-                      <div className="chart-container">
-                        <Bar data={chartConfig} options={chartOptions} />
-                      </div>
-                    ) : (
-                      <div className="admin-empty-state">No attendance records available yet.</div>
-                    )}
-                  </div>
-
-                  <div className="admin-panel">
-                    <div className="admin-panel-header">
-                      <div>
-                        <p className="admin-panel-eyebrow">Workload</p>
-                        <h2 className="admin-panel-title">Operational summary</h2>
-                      </div>
-                      <button type="button" className="admin-action-btn" onClick={() => handleTabClick('tasks')}>Open tasks</button>
-                    </div>
-                    <div className="admin-mini-grid">
-                      <div className="admin-mini-card"><span>Total tasks</span><strong>{dashboardTasks.length}</strong></div>
-                      <div className="admin-mini-card"><span>Completed</span><strong>{completedTasks}</strong></div>
-                      <div className="admin-mini-card"><span>Claims pending</span><strong>{pendingReimbursements}</strong></div>
-                      <div className="admin-mini-card"><span>Approved claims</span><strong>{formatCurrency(approvedReimbursementAmount)}</strong></div>
-                    </div>
-                  </div>
-                </section>
-
-                <section className="admin-dashboard-grid">
-                  <div className="admin-panel">
-                    <div className="admin-panel-header">
-                      <div>
-                        <p className="admin-panel-eyebrow">Trend</p>
-                        <h2 className="admin-panel-title">Employee presence trend</h2>
-                      </div>
-                      <span className="admin-pill">Avg {averageHours.toFixed(1)} hrs/day</span>
-                    </div>
-                    {chartData.length ? (
-                      <div className="chart-container">
-                        <Line
-                          data={{
-                            labels: chartData.map((item) => item.date),
-                            datasets: [
-                              {
-                                label: 'Employees Present',
-                                data: chartData.map((item) => item.employeesPresent),
-                                borderColor: '#2563eb',
-                                backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                                fill: true,
-                                tension: 0.36,
-                              },
-                              {
-                                label: 'Total Hours',
-                                data: chartData.map((item) => item.totalHours),
-                                borderColor: '#14b8a6',
-                                backgroundColor: 'rgba(20, 184, 166, 0.08)',
-                                fill: true,
-                                tension: 0.36,
-                              },
-                            ],
-                          }}
-                          options={chartOptions}
-                        />
-                      </div>
-                    ) : (
-                      <div className="admin-empty-state">Attendance trend will appear after punch records are available.</div>
-                    )}
-                  </div>
-
-                  <div className="admin-panel">
-                    <div className="admin-panel-header">
-                      <div>
-                        <p className="admin-panel-eyebrow">Leave pipeline</p>
-                        <h2 className="admin-panel-title">Leave distribution</h2>
-                      </div>
-                      <button type="button" className="admin-action-btn" onClick={() => handleTabClick('leaves')}>Review</button>
-                    </div>
-                    {dashboardLeaves.length ? (
-                      <div className="chart-container">
-                        <Pie
-                          data={{
-                            labels: ['Approved', 'Pending', 'Rejected'],
-                            datasets: [
-                              {
-                                data: [approvedLeaves, pendingLeaves, rejectedLeaves],
-                                backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
-                                borderColor: ['#10b981', '#f59e0b', '#ef4444'],
-                                borderWidth: 1,
-                              },
-                            ],
-                          }}
-                          options={{
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                              legend: { labels: { color: '#1e40af' }, position: 'bottom' },
-                              tooltip: chartOptions.plugins.tooltip,
-                            },
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="admin-empty-state">No leave requests found.</div>
-                    )}
-                  </div>
-                </section>
-
-                <section className="admin-dashboard-grid">
-                  <div className="admin-panel">
-                    <div className="admin-panel-header">
-                      <div>
-                        <p className="admin-panel-eyebrow">People</p>
-                        <h2 className="admin-panel-title">Department strength</h2>
-                      </div>
-                      <button type="button" className="admin-action-btn" onClick={() => handleTabClick('employee-list')}>Employees</button>
-                    </div>
-                    {departmentEntries.length ? (
-                      <div className="chart-container">
-                        <Doughnut
-                          data={{
-                            labels: departmentEntries.map(([label]) => label),
-                            datasets: [
-                              {
-                                data: departmentEntries.map(([, count]) => count),
-                                backgroundColor: ['#2563eb', '#14b8a6', '#f59e0b', '#8b5cf6', '#ef4444', '#64748b'],
-                                borderColor: ['#2563eb', '#14b8a6', '#f59e0b', '#8b5cf6', '#ef4444', '#64748b'],
-                                borderWidth: 1,
-                              },
-                            ],
-                          }}
-                          options={{
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                              legend: { labels: { color: '#1e40af' }, position: 'bottom' },
-                              tooltip: chartOptions.plugins.tooltip,
-                            },
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="admin-empty-state">Department data will appear after employee records are added.</div>
-                    )}
-                  </div>
-
-                  <div className="admin-panel">
-                    <div className="admin-panel-header">
-                      <div>
-                        <p className="admin-panel-eyebrow">Payroll</p>
-                        <h2 className="admin-panel-title">Salary trend</h2>
-                      </div>
-                      <button type="button" className="admin-action-btn" onClick={() => handleTabClick('salary')}>Payroll</button>
-                    </div>
-                    {salaryTrendEntries.length ? (
-                      <div className="chart-container">
-                        <Line
-                          data={{
-                            labels: salaryTrendEntries.map(([month]) => month),
-                            datasets: [
-                              {
-                                label: 'Payroll Amount',
-                                data: salaryTrendEntries.map(([, amount]) => amount),
-                                borderColor: '#8b5cf6',
-                                backgroundColor: 'rgba(139, 92, 246, 0.12)',
-                                fill: true,
-                                tension: 0.36,
-                              },
-                            ],
-                          }}
-                          options={chartOptions}
-                        />
-                      </div>
-                    ) : (
-                      <div className="admin-empty-state">Salary trend will appear after salary slips are generated.</div>
-                    )}
-                  </div>
-                </section>
-
-                <section className="admin-panel admin-table-card">
-                  <div className="admin-panel-header">
-                    <div>
-                      <p className="admin-panel-eyebrow">Live records</p>
-                      <h2 className="admin-panel-title">Recent attendance</h2>
-                    </div>
-                    <button type="button" className="admin-action-btn" onClick={() => handleTabClick('attendance')}>View all</button>
-                  </div>
-                  {recentAttendanceRows.length ? (
-                    <div className="table-responsive">
-                      <Table className="admin-table table-hover">
-                        <thead>
-                          <tr>
-                            <th>Date</th>
-                            <th>Employee ID</th>
-                            <th>Name</th>
-                            <th>Punch In</th>
-                            <th>Punch Out</th>
-                            <th>Hours</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {recentAttendanceRows.map((att, index) => (
-                            <tr key={`${att.date}-${att.employeeId}-${index}`}>
-                              <td>{att.date}</td>
-                              <td>{att.employeeId || 'N/A'}</td>
-                              <td>{att.name || 'N/A'}</td>
-                              <td>{att.punchIn || 'N/A'}</td>
-                              <td>{att.punchOut || 'N/A'}</td>
-                              <td><span className="admin-status active">{att.hoursWorked || 'N/A'}</span></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </Table>
-                    </div>
-                  ) : (
-                    <div className="admin-empty-state">No recent attendance rows available.</div>
-                  )}
-                </section>
+              <div className="animate__animated animate__fadeIn">
+                <AdminOverview
+                  profile={profile}
+                  onNavigate={handleTabClick}
+                  canOpen={(tab) => hasTabAccess(profile, tab)}
+                  showLiveOps={hasModuleAccess(profile, 'attendance')}
+                />
               </div>
             )}
             {activeTab === 'reports-center' && (
@@ -2829,6 +2355,21 @@ const AdminDashboard = () => {
             {activeTab === 'employee-locations' && (
               <div className="animate__animated animate__fadeInUp">
                 <EmployeeLocationTracker />
+              </div>
+            )}
+            {activeTab === 'employee-monitor' && (
+              <div className="animate__animated animate__fadeIn">
+                <EmployeeMonitor onOpenActivity={() => handleTabClick('activity-log')} />
+              </div>
+            )}
+            {activeTab === 'activity-log' && (
+              <div className="animate__animated animate__fadeIn">
+                <EmployeeActivity />
+              </div>
+            )}
+            {activeTab === 'activity-alerts' && (
+              <div className="animate__animated animate__fadeIn">
+                <ActivityAlerts />
               </div>
             )}
             {activeTab === 'tracking' && (

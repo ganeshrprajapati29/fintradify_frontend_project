@@ -62,13 +62,17 @@ const AdminSettings = () => {
       workEndTime: data.workEndTime || '18:00',
       breakStartTime: data.breakStartTime || '13:00',
       breakEndTime: data.breakEndTime || '14:00',
-      workingDays: data.workingDays || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+      workingDays: data.workingDays || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
       allowLateCheckIn: data.allowLateCheckIn ?? true,
       lateCheckInGracePeriod: data.lateCheckInGracePeriod || 15,
       allowEarlyCheckOut: data.allowEarlyCheckOut ?? true,
       earlyCheckOutGracePeriod: data.earlyCheckOutGracePeriod || 15,
       allowWorkFromHome: data.allowWorkFromHome ?? true,
       extraShiftPayRate: data.extraShiftPayRate ?? 1,
+      attendanceAutoApproveMinutes: data.attendanceAutoApproveMinutes ?? 5,
+      requireLocationForPunch: data.requireLocationForPunch ?? true,
+      liveTrackingMode: data.liveTrackingMode || 'always',
+      liveTrackingIntervalSeconds: data.liveTrackingIntervalSeconds ?? 30,
     });
 
     setLeaveSettings({
@@ -682,6 +686,48 @@ const AdminSettings = () => {
                     </Form.Text>
                   </Form.Group>
                 </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Auto-approve attendance after (minutes)</Form.Label>
+                    <Form.Control
+                      type="number"
+                      min="0"
+                      max="1440"
+                      value={attendanceSettings.attendanceAutoApproveMinutes ?? 5}
+                      onChange={(e) => setAttendanceSettings({...attendanceSettings, attendanceAutoApproveMinutes: Math.max(0, parseInt(e.target.value, 10) || 0)})}
+                    />
+                    <Form.Text muted>
+                      Pending punch-ins and punch-outs are approved automatically after this many minutes (0 = off).
+                      Missed punch-outs always wait for HR.
+                    </Form.Text>
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Live location tracking</Form.Label>
+                    <Form.Select
+                      value={attendanceSettings.liveTrackingMode || 'always'}
+                      onChange={(e) => setAttendanceSettings({...attendanceSettings, liveTrackingMode: e.target.value})}
+                    >
+                      <option value="always">Always — whenever the employee is signed in to the app</option>
+                      <option value="duty">Only while punched in</option>
+                    </Form.Select>
+                    <Form.Text muted>The app keeps sharing location in the background, even when it is closed or swiped away.</Form.Text>
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>Location update interval (seconds)</Form.Label>
+                    <Form.Control
+                      type="number"
+                      min="10"
+                      max="600"
+                      value={attendanceSettings.liveTrackingIntervalSeconds ?? 30}
+                      onChange={(e) => setAttendanceSettings({...attendanceSettings, liveTrackingIntervalSeconds: Math.min(600, Math.max(10, parseInt(e.target.value, 10) || 30))})}
+                    />
+                    <Form.Text muted>How often a phone reports while standing still. It reports sooner while moving.</Form.Text>
+                  </Form.Group>
+                </Col>
               </Row>
               <Row>
                 <Col md={6}>
@@ -709,6 +755,15 @@ const AdminSettings = () => {
                     label="Allow employees to request Work From Home"
                     checked={attendanceSettings.allowWorkFromHome}
                     onChange={(e) => setAttendanceSettings({...attendanceSettings, allowWorkFromHome: e.target.checked})}
+                  />
+                </Col>
+                <Col md={6}>
+                  <Form.Check
+                    type="switch"
+                    id="require-location-for-punch"
+                    label="Require location to punch in / out (app and website)"
+                    checked={attendanceSettings.requireLocationForPunch ?? true}
+                    onChange={(e) => setAttendanceSettings({...attendanceSettings, requireLocationForPunch: e.target.checked})}
                   />
                 </Col>
               </Row>

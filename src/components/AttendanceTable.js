@@ -192,24 +192,22 @@ const AttendanceTable = ({ isEmployee }) => {
     punchingRef.current = true;
     setPunching(true);
     try {
-      // Location off or blocked: the punch is still recorded, without a location.
-      // The browser shows its "Allow location" prompt here the first time.
-      let coords = null;
-      let locationHint = '';
+      // Location is required: the browser shows its "Allow location" prompt here the first
+      // time, and without a location the punch is not sent.
+      let coords;
       try {
         coords = await getBrowserLocation();
       } catch (geoError) {
-        coords = null;
-        locationHint = ' To share your location next time, allow location for this site from the lock icon in the address bar and turn on GPS/location.';
+        setSuccess('');
+        setError(`${geoError.message} Allow location for this site from the lock icon in the address bar, turn on GPS/location and try again.`);
+        return;
       }
-      const response = await api.post('/attendance/punch', coords
-        ? {
-          type,
-          location: { lat: coords.latitude, lng: coords.longitude, accuracy: coords.accuracy },
-          address: `${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`,
-        }
-        : { type });
-      setSuccess(`${response.data.message || `Punch ${type} recorded successfully`}${locationHint}`);
+      const response = await api.post('/attendance/punch', {
+        type,
+        location: { lat: coords.latitude, lng: coords.longitude, accuracy: coords.accuracy },
+        address: `${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`,
+      });
+      setSuccess(response.data.message || `Punch ${type} recorded successfully`);
       setError('');
       if (type === 'in' && response.data.popupMessage) {
         setPunchModePopup({
