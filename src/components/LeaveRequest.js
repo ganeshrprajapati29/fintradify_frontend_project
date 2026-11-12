@@ -107,16 +107,7 @@ const LeaveRequest = ({ isAdmin }) => {
       return;
     }
 
-    const selectedBalance = formData.type === 'unpaid'
-      ? Number(leaveBalances.unpaidLeaveBalance || 0)
-      : Number(leaveBalances.paidLeaveBalance || 0);
-    const selectedLabel = formData.type === 'unpaid' ? 'unpaid' : 'paid';
-
-    if (requestedDays > selectedBalance) {
-      setError(`Insufficient ${selectedLabel} leave balance. Available: ${selectedBalance}, requested: ${requestedDays}.`);
-      return;
-    }
-
+    // Leave can be applied whatever the balance; the balance is shown for information only.
     setSubmitting(true);
     try {
       await api.post('/leaves', formData);
